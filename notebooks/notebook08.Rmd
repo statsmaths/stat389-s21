@@ -1,0 +1,89 @@
+---
+title: "Notebook 08: Metrics: G-Score"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+```{r message=FALSE}
+library(tidyverse)
+library(forcats)
+library(ggrepel)
+library(smodels)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+options(width = 77L)
+```
+
+## Spam, one last time
+
+For a final time, let's look at the spam text message data.
+
+```{r, message=FALSE}
+spam <- read_csv("data/spam.csv") %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+token <- read_csv("data/spam_token.csv.gz")
+```
+
+We will see today a simple metric that we can use in parallel to the
+coefficients from a penalized linear regression.
+
+### Dunn-Likelihood, G-squared
+
+Given a textual feature (such as a word count) and a variable that groups a
+corpus into two groups, the Dunn-likelihood, or G-squared, metric indicates how
+strongly the feature is associated with one group over the other. To compute
+the measurement, we use the function `sm_dunn_ll`, providing the name of the
+grouping variable and the feature variable. Note that this often requires
+joining together the token data set and the text data set; be careful to drop
+off the text column so as not to create many large copies of the corpus.
+
+```{r}
+left_join(token, select(spam, doc_id, class), by = "doc_id") %>%
+  sm_dunn_ll(group_name = "class", token_name = "lemma") %>%
+  arrange(dunn)
+```
+
+The sign of the score indicates which group a feature is most associated with;
+the magnitude gives the size of the effect. The output here shows many of the
+same features we saw before, such as £, "call", "txt" and "!". Looking at the
+most positive features also is similar to the results we had previously from
+the penalized regression model:
+
+```{r}
+left_join(token, select(spam, doc_id, class), by = "doc_id") %>%
+  sm_dunn_ll(group_name = "class", token_name = "lemma") %>%
+  arrange(desc(dunn))
+```
+
+The score can be used equally as well with other features, such as the
+universal part of speech codes:
+
+```{r}
+left_join(token, select(spam, doc_id, class), by = "doc_id") %>%
+  sm_dunn_ll(group_name = "class", token_name = "upos") %>%
+  arrange(dunn)
+```
+
+And again, this is similar to the patterns we saw looking at the coefficients
+of a penalized regression model.
+
+What are the relative benefits and drawbacks of the G-squared metric relative
+to running a penalized regression model? The G-squared metric is useful because
+it provides an absolute number that does not depend on the other features in the
+model or the tuning parameters (alpha and lambda) used in the model. It can be
+safely compared across corpora even when the length of documents or frequency
+of terms is very different between the two. One downside is that it does not
+provide an overall accuracy or confusion matrix that allows us to see how
+useful a feature is in distinguishing two categories. It also does not allow
+us to include additional covariates. But perhaps the biggest downside is that
+the G-squared does not work in the case of more than two categories.
+
+Generally, I recommend using the two in tandem. I typically start with the
+predictive model and then use the G-squared values to indicate the strength
+of a relationship once I have identified interesting terms. Also, I find the
+G-squared value particularly useful when looking at the frequency of POS tags
+or dependency relationships between two groups.

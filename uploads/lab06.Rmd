@@ -1,0 +1,4 @@
+---
+title: "Lab 06"
+output: html_document
+---

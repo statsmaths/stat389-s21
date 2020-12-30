@@ -1,0 +1,126 @@
+---
+title: "Introduction to R and RStudio Cloud Setup"
+author: "Taylor Arnold"
+date: "2020-08-27"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    css: [default, metropolis, metropolis-fonts]
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+class: center, inverse, middle, title-slide
+
+# The R Programming Language
+
+---
+
+# What is R
+
+R is an open-source programming language focused on data analysis. It is
+a very popular language in academia, industry, and government work. Typically
+somewhere in the top-20 most popular programming languages (TIOBE: 8th, GitHub:
+12th, StackOverflow: 16th).
+
+R is also a relatively old language. It was first developed under the name "S"
+at Bell Labs by Rick Becker, John Chambers, and Alan Wilks in 1976. The language
+was originally closed-source, prompting Ross Ihaka and Robert Gentleman to
+develop and free, open-source reimplementation of the language in 1993.
+
+---
+
+# Components
+
+It will be helpful to understand some of the components of the software we will
+be using this semester. There are three different things that are needed, all
+of which are provided as free and open-source software:
+
+1. The core R programming language itself.
+2. RStudio: an additional piece of software that provides tools for writing R
+code (i.e., an integrated development environment).
+3. Additional third-party extensions to R known as *packages*.
+
+---
+
+# Options
+
+You have two options for working with R this semester. You can either install
+it on your own computer, or use a cloud-based service that the university has
+bought for this academic year.
+
+Based on experience last semester, I strongly recommend trying to set up R on
+your own machine first. You can fall back to the cloud-based option in the
+event of any difficulties.
+
+---
+class: center, inverse, middle, title-slide
+
+# Local Setup (recommended)
+
+---
+
+# Local Setup (recommended)
+
+Some students may choose to run RStudio locally on their own machine rather than logging
+into RStudio cloud. This is perfectly fine, and does have several advantages: will work
+after the end of the semester, no need to internet access, and may be faster if you have
+a newer laptop.
+
+Note, however, that I will not be able to offer much technical support for alternative
+setups. I recommend setting up RStudio Cloud even if you intend to work locally in case
+you run into software problems later on. This is particularly true for students running
+Windows, which may run into unique errors during some of the later lessons on web scraping
+and text analysis.
+
+---
+
+# Local Setup (recommended)
+
+In order to setup the course materials locally you should:
+
+1. Install the [R programming language](https://cran.r-project.org/) language from CRAN.
+2. Install [RStudio](https://rstudio.com/products/rstudio/download/#download).
+3. Download and uncompress the zip file from the course website.
+4. Open the file `setup.R` in RStudio and run both chunks of code. Note that you may
+need to open the Console at the bottom and respond to a question about updating packages
+(you probably want to answer "yes").
+
+Now you can open the other notebooks just as we are doing on RStudio Cloud.
+
+---
+class: center, inverse, middle, title-slide
+
+# RStudio Cloud
+
+---
+
+# RStudio Cloud Setup
+
+Now, let's see how to setup RStudio Cloud. This should be a relatively
+straightforward process:
+
+1. Click on the RStudio Cloud link at the top of the course website.
+2. This will open a login page. Assuming you do not yet have an account, click
+on the sign up link and create one with your `richmond.edu` email address.
+3. Pick a username, which can be anything you would like.
+4. After signing in, you should be prompted to "Join Space". Select yes.
+5. Now, click on the projects and select the button next to "Introduction Data
+Science" to create your own version of the course notes.
+
+If you get stuck at any point with these steps, I suggest going back to the
+course website and clicking on the RStudio Cloud link again. Sometimes after
+creating a new account in does not re-direct you at first to the course website.
+
+---
+
+# RStudio Cloud Setup
+
+You should now have a new project created that contains some starter code. This
+is where we will start most classes going forward. For the rest of today's notes
+we will walk through an introduction to R using the first notebook.
+
+In the future, you should be able to return to this screen by clicking on the
+RStudio Cloud link on the website and logging in.

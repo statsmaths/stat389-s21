@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Introduction to MATH389</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Taylor Arnold" />
+    <meta name="date" content="2020-12-30" />
+    <script src="libs/header-attrs-2.6/header-attrs.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/metropolis.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/metropolis-fonts.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Introduction to MATH389
+### Taylor Arnold
+### 2020-12-30
+
+---
+
+class: center, inverse, middle, title-slide
+
+# Part 1: Welcome!
+
+---
+
+# Welcome!
+
+Welcome to Statistical Learning!
+
+Today we are going to go through a few notes, which give a long-form version of
+the posted syllabus. We will then walk through setting up the software we will
+be using throughout the semester.
+
+You should feel free to ask questions at any point during the semester. Please
+either (i) use the Zoom raise hand feature, (ii) post your question or just a
+question mark in the chat window, or (iii) wait for a pause and shout out
+directly.
+
+---
+
+# Website
+
+We will get to all of the course details soon. Before that, as reminder from my
+emails to the class, all of the materials for the course can be found on the
+course website:
+
+- https://statsmaths.github.io/stat389-s21/
+
+Make sure to bookmark this somewhere easy to access. The page will remain
+online indefinitely for your reference following the semester.
+
+---
+class: center, inverse, middle, title-slide
+
+# Part 2: Course Content
+
+---
+
+# What Is "Learning"?
+
+Statistical learning, synonymous with machine learning, is the process
+of extracting knowledge from data automatically, usually with the goal
+of making predictions on new, unseen data.
+
+A classical example is a spam filter, for which the user keeps labelling
+incoming mails as either spam or not spam. A machine learning algorithm
+then "learns" a predictive model from data that distinguishes spam from
+normal emails, a model which can predict for new emails whether they
+are spam or not.
+
+---
+
+# Further Examples
+
+- using physical characteristics of animals to predict whether
+they are carnivores
+- estimate how much a house is worth given properties such as
+number of bedrooms, square footage and its address
+- predict whether a flight will be delayed given the carrier,
+scheduled departure time, arrival and departure airports
+- a crime has been reported at a specific place and time in
+Chicago; what type of crime is it?
+- here is a picture of a flower, what kind of flower is it?
+- given two sentences of text, predict which President used it
+in a public speech
+- how many page views will a specific Wikipedia page receive
+tomorrow?
+
+---
+
+# What we will cover
+
+This class is not about teaching you a wide range of models, nor is it
+really about the study of models in the first place. Rather, I want you
+to learn how we can use learning algorithms to study complex datasets.
+
+To this end, we are going to focus specifically on the the analysis of
+textual data with the use of statistical learning algorithms. The course
+will start with a few weeks of material that introduce the core concepts,
+and then we will move toward applying them to several different textual
+corpora. Along the way, additional topics in text analysis will be explored.
+
+To things we will not do much of: (1) using neural networks or other
+deep learning algoriths, or (2) discussing much about the theory behind
+the methods. For either of these, I would be happy to refer you to a
+number of excellent and free online resources.
+
+---
+
+# Prerequisites and MATH289
+
+This course is designed to be the second set of a sequence formed with
+MATH289. I will assume that everyone is familiar with the core ideas from
+that class about running code in R, producing data visualizations and
+making arguments about data. However, this semester this is not a strict
+prerequisite (it will be next year). I have put together notes linked to
+this course as a way of catching up if you are coming from another programming
+language or need a refresh of the concepts.
+
+---
+class: center, inverse, middle, title-slide
+
+# Part 3: Format
+
+---
+
+# Online Format
+
+Due to social distancing guidelines and the need to maximize flexibility, this
+course is being taught using online instruction. Classes will be presented
+remotely over Zoom. A link to the Zoom room is provided on the course website.
+A numeric password was sent via email to the class roster.
+
+The course has been designed so that only minimal changes will be needed in the
+event that some or all students need to return home before the normal end of
+the semester.
+
+---
+
+# Course Format
+
+Most class meetings will consist of a short presentation of some new concepts,
+followed by breaking out into groups to either work through a set of applied
+data analysis questions or to start working on the next project.
+
+Students are not allowed to record the text or video of the class without prior
+permission. When permission is granted, recordings must not be shared and shall
+be destroyed at the end of the semester.
+
+---
+
+# Groups
+
+During the first week of the semester students will be organized into groups
+of around 3 people each. A large portion of the course work will be done using
+break-out groups within these teams.
+
+I plan to share Google Drive folder with each group to facilitate sharing and
+submitting materials.
+
+---
+
+# Projects
+
+The core output of the course will be the completion of five projects. These
+will be assigned throughout the course of the semester and focus on the
+application of the course material to various textual corpora. Projects will
+be completed together in your class group. There will usually be plenty of
+class time to work on each project. We will also have time to present a subset
+of the projects to the rest of the class. Tentative due-dates and topics are
+posted on the course website and will be updated as needed.
+
+---
+
+# Grades
+
+Each group's project will be graded as either Satisfactory/Unsatisfactory,
+along with extensive constructive feedback. At the end of the semester, each
+student will individually submit a self-assessment of their work in the course,
+how they contributed to each project, and what they have learned during the
+semester.
+
+All students who have earned satisfactory grades on the five projects, and
+missed no more than two classes, will earn a grade of at least a B+. Grades of
+B+, A-, A, and A+ will be given according to each student's self-assessment in
+light of their projects and course participation.
+
+---
+
+# Attendance Policies
+
+Given the amount of group-work required during the course meetings, it is
+important for everyone to make an attempt to attend every class. With the
+exception of extended absenses due to serious illness or family emergencies,
+students will recieve a reduction in their final grade (including the
+possibility of a failing grade) after missing more than two class meetings.
+
+---
+
+# Zoom policies
+
+Please follow the following policies when joining the group office hours and
+course meetings:
+
+- Use your UR Zoom login account.
+- Include a profile photo (but does not to literally be a "profile photo").
+- Camera is optional when we are meeting as a whole class. I appreciate having
+it on for office hours and when in break-out rooms.
+- Be prepared to share screen if called on.
+- Chat window is the easiest way to indicate that you have a question (either
+- post or just type "?"). Welcome to "raise hand" or shout out your question if
+that seems easiest.
+
+If you have any concerns about any of these items, please let me know.
+
+---
+
+# Special Circumstances
+
+I completely understand that extenuating circumstances may arise throughout the
+semester that effect your ability to attend class or follow along with the pace
+of the course. Please contact me as soon as possible so that we can find the
+best path forward.
+
+---
+
+# Office Hours
+
+Given social distancing rules, I find the easiest way to answer questions
+is by finding time before, during, or after our scheduled class meeting times.
+I will always make a habit of staying after class as long as students have
+questions. If you want to meet right before class, just let me know.
+If you have extended questions, personal concerns, or are unable to meet on
+either side of the class meeeting, please feel free to email me or ask in class
+for a dedicated appointment.
+
+---
+
+# Frequently Asked Questions
+
+- **Is there a textbook for the course?** No, we will be using my own notes and
+references to other freely available resources.
+- **Is there a final exam?** No.
+- **When are the projects due?** Tentative dates are given on the course
+website.
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

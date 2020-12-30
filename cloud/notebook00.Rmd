@@ -1,0 +1,11 @@
+---
+title: "Update Notebooks"
+output: html_
+---
+
+Use this notebook to update the available notebooks in your work space. Run the
+code chunk below to get the most up-to-date files.
+
+```{r}
+source(file.path("funs", "update.R"))
+```

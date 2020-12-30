@@ -1,0 +1,19 @@
+---
+title: "Notebook 12: Latent Dirchlet Allocation (LDA)"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+```{r message=FALSE}
+library(tidyverse)
+library(forcats)
+library(ggrepel)
+library(smodels)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+options(width = 77L)
+```

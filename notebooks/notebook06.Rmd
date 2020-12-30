@@ -1,0 +1,306 @@
+---
+title: "Notebook 06: Natural Language Processing"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+```{r message=FALSE}
+library(tidyverse)
+library(forcats)
+library(ggrepel)
+library(smodels)
+library(cleanNLP)
+library(glmnet)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+options(width = 77L)
+```
+
+## Amazon Product Classification
+
+In these notes we will look a data set of product reviews from Amazon. Reviews
+come from one of three different categories (Books, Films, and Food); the
+classification task we will investigate is the classification of items into
+one of these three categories.
+
+```{r, message = FALSE}
+set.seed(1)
+
+amazon <- read_csv("data/amazon_product_class.csv") %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+amazon
+```
+
+We will use a more sophisticated method for producing TF matrices and see how
+to work with text classification when there are more than two categories.
+
+### Natural language processing (NLP)
+
+As we did in the previous notes, we will use the **cleanNLP** package to split
+the textual data into a format with one row for each token (word or punctuation
+mark). Last time we used the **stringi** backend, which is fast but error-prone.
+This time we will use a library called **spacy** for extracting linguistic
+features from the text. Running this back end can be done with the following
+code:
+
+```{r, eval=FALSE}
+cnlp_init_spacy("en_core_web_sm")
+token <- cnlp_annotate(amazon)$token
+```
+
+However, it requires having the Python library spacy already installed and set
+up on your machine. It also can take a few minutes to finish parsing the text.
+As an alternative, we will just load in the pre-computed data here (and I will
+provide similar parsed data for the lab and projects):
+
+```{r, message = FALSE}
+token <- read_csv("data/amazon_product_class_token.csv.gz")
+token
+```
+
+There is a lot of information that has been automatically added to this table,
+the collective results of decades of research in computational linguistics and
+natural language processing. Each row corresponds to a word or a punctuation
+mark, along with metadata describing the token. Notice that reading down the
+column `token` reproduces the original text. The columns available
+are:
+
+- **doc_id**: A key that allows us to group tokens into documents and to link
+back into the original input table.
+- **sid**: Numeric identifier of the sentence number.
+- **tid**: Numeric identifier of the token within a sentence. The first three
+columns form a primary key for the table.
+- **token**: A character variable containing the detected token, which is either
+a word or a punctuation mark.
+- **token_with_ws**: The token with whitespace (i.e., spaces and new-line
+characters) added. This is useful if we wanted to re-create the original text
+from the token table.
+- **lemma**: A normalized version of the token. For example, it removes
+start-of-sentence capitalization, turns all nouns into their singular form,
+and converts verbs into their
+infinitive form.
+- **upos**: The universal part of speech code, which are parts of speech that
+can be defined in (most) spoken languages. These tend to correspond to the
+parts of speech taught in primary schools, such as "NOUN", "ADJ" (Adjective),
+and "ADV" (Adverb). The full set of codes and
+their meaning can be found here:
+[Universal POS tags](https://universaldependencies.org/u/pos/).
+- **xpos**: A fine-grained part of speech code that depends on the specific
+language (here, English) and models being used. You can find more information
+here: [spaCy POS tags](https://spacy.io/api/annotation#pos-tagging)
+- **tid_source** The token id of the word in the sentence that this token is
+grammatically related to. Relations always occur within a sentence, so there is
+no need for a seperate indication of the source **sid**.
+- **relation**: The name of the relation implied by the **tid_source** variable.
+Allowed relations differ slightly across models and languages, but the core set
+are relatively stable. The codes in this table are
+[Universal Dependencies](https://universaldependencies.org/en/dep/index.html).
+
+There are many analyses that can be performed on the extracted features in this
+table. We will look at a few here and expand on them over the next few weeks.
+
+### Fitting a model
+
+Before delving into the new variables in the tokens table, let's start by
+replicating the analysis we did last time with the spam data for the Amazon
+product category. Because this is a larger data set, we will set some additional
+parameters to the `cnlp_utils_tf` function to include only those terms that are
+in at least 0.1% of the corpus and no more than 50% of the corpus. We can also
+set the maximum number of terms that will be included.
+
+```{r}
+X <- token %>%
+  cnlp_utils_tf(doc_set = amazon$doc_id,
+                min_df = 0.001,
+                max_df = 0.5,
+                max_features = 10000)
+
+dim(X)
+```
+
+As before, we will create training data and run the glmnet function. Because
+have three classes this time, we set the family to "multinomial".
+
+```{r}
+X_train <- X[amazon$train_id == "train", ]
+y_train <- amazon$category[amazon$train_id == "train"]
+
+model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
+```
+
+Like the spam model, our penalized regression does a very good job of
+classifying products. The training set is nearly 99% accurate and the
+validation set is 96.5% accurate.
+
+```{r}
+amazon %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(category == pred))
+```
+
+Looking at a confusion matrix, we see that the few mistakes that do occur
+happen when books and films are confused with one another. Can you think of
+why this might happen?
+
+```{r}
+amazon %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  select(category, pred, train_id) %>%
+  table()
+```
+
+The code to look at the coefficients is slightly different here because this is
+a multinomial model rather than a binomial one. Each category has its own
+coefficients.
+
+```{r}
+temp <- coef(model, s = model$lambda[22])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
+
+You should see that the words that come out of the model match our intuition
+for what words would be associated with each product type.
+
+### POS tags
+
+Now, let's see what we can do by making use of the part of speech tags in the
+tokens data. To start, we can get a sense of the most common lemmas associated
+with each universal part of speech:
+
+```{r}
+token %>%
+  group_by(upos, lemma) %>%
+  summarize(sm_count()) %>%
+  arrange(desc(count)) %>%
+  slice_head(n = 8) %>%
+  summarize(sm_paste(lemma))
+```
+Then, we can use these codes to filter the data to include only certain
+parts of speech in our model. For example, we can look at only verbs:
+
+```{r}
+X <- token %>%
+  filter(upos == "VERB") %>%
+  cnlp_utils_tf(doc_set = amazon$doc_id,
+                min_df = 0.001,
+                max_df = 0.5,
+                max_features = 10000)
+
+dim(X)
+```
+
+The model has significantly fewer variables now. We then train the data as
+before:
+
+```{r}
+X_train <- X[amazon$train_id == "train", ]
+y_train <- amazon$category[amazon$train_id == "train"]
+
+model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
+```
+
+How well does the model do in predicting the category of the product? It's
+okay, but not as good as the original model:
+
+```{r}
+amazon %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(category == pred))
+```
+
+But keep in mind that our goal is not to find the most predictive model. Rather,
+we want to use the predictive model to understand the data. Filtering on just
+verbs does just that. We can, for example, see what verbs as associated with
+each category:
+
+```{r}
+temp <- coef(model, s = model$lambda[14])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
+
+As with the first model matrix, most of these should seem reasonable to you
+based on the categories.
+
+### Dependencies
+
+Dependencies give relationships between words in a sentence. For example,
+they relate the subject and object of a sentence to a verb. Or, relate an
+adjective to the noun that it modifies. We will use these extensively when
+we get to stylometric analysis, but it is a good idea to start seeing how
+they can be used even in a simple classification analysis. For example,
+we can find which verbs are associated with sentences where the subject is
+"I":
+
+```{r}
+token %>%
+  left_join(
+    select(token, doc_id, sid, tid_source = tid, lemma_source = lemma),
+    by = c("doc_id", "sid", "tid_source")
+  ) %>%
+  filter(token == "I", relation == "nsubj") %>%
+  group_by(lemma_source) %>%
+  summarize(sm_count()) %>%
+  arrange(desc(count))
+```
+
+Likewise, we can use these verbs to build a model:
+
+```{r}
+X <- token %>%
+  left_join(select(token, doc_id, sid, tid_source = tid, lemma_source = lemma),
+            by = c("doc_id", "sid", "tid_source")) %>%
+  filter(token == "I", relation == "nsubj") %>%
+  cnlp_utils_tf(doc_set = amazon$doc_id,
+                min_df = 0.001,
+                max_df = 1,
+                max_features = 10000,
+                token_var = "lemma_source")
+
+dim(X)
+```
+
+Fitting it as before:
+
+```{r}
+X_train <- X[amazon$train_id == "train", ]
+y_train <- amazon$category[amazon$train_id == "train"]
+
+model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
+```
+
+As you might expect, this model is not nearly as predictive as it ignores
+many of the useful features in the review. However, given it's limited
+information, it does almost twice as well as random guessing would:
+
+```{r}
+amazon %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(category == pred))
+```
+
+And as with the verb-based model, it is really the coefficents that are the
+most interesting for us to work with:
+
+```{r}
+temp <- coef(model, s = model$lambda[14])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
+
+Do these also match your intuition for what verbs would be associated with
+each product?

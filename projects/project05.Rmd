@@ -1,0 +1,26 @@
+---
+title: "Project 05 -- Instructions"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+
+theme_set(theme_minimal())
+options(pillar.min_character_chars = 15)
+Sys.setlocale("LC_TIME", "en_US.UTF-8")
+```
+
+**Due Date**: 22 April 2021
+
+This page outlines the instructions for the first project. You should
+have a file `project05.Rmd` in your RStudio workspace where you can
+work on the project.
+
+## Instructions

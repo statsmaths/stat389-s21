@@ -1,0 +1,223 @@
+---
+title: "Notebook 07: N-Grams, Skip-Grams, and TF Covariates"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+```{r message=FALSE}
+library(tidyverse)
+library(forcats)
+library(ggrepel)
+library(smodels)
+library(cleanNLP)
+library(glmnet)
+library(stringi)
+library(Matrix)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+options(width = 77L)
+```
+
+```{r}
+library(tokenizers)
+library(tibble)
+```
+
+## Spam, again
+
+For these notes, we will look again at the spam text message data. Here, we will
+load a version of the main data as well as the associated tokens parsed by the
+spacy library.
+
+```{r, message = FALSE}
+set.seed(1)
+
+spam <- read_csv("data/spam.csv") %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+token <- read_csv("data/spam_token.csv.gz")
+```
+
+Our goal will be seeing ways of creating different types of model matrices.
+
+### N-gram
+
+In using the TF matrix, we are ignoring all contextual information about how
+words are used in the documents. One way to alleviate this is to consider
+N-grams, counting combinations of words that occur one after one another. So,
+a 2-gram considers pairs of subsequent words, 3-grams triples, and so forth.
+To create N-grams we will use the function `sm_ngram`. We can provide the
+maximum length of the N-grams, as well as the minimum length. Here, we consider
+1- and 2-grams:
+
+```{r}
+token %>%
+  sm_ngram(n = 2, n_min = 1)
+```
+
+We can then use these N-grams as an input to our data matrix:
+
+```{r}
+X <- token %>%
+  sm_ngram(n = 2, n_min = 1) %>%
+  cnlp_utils_tf(doc_set = spam$doc_id,
+                min_df = 0.005,
+                max_df = 1,
+                max_features = 10000,
+                token_var = "token")
+
+dim(X)
+```
+
+And fit a model, just as before:
+
+```{r}
+X_train <- X[spam$train_id == "train", ]
+y_train <- spam$class[spam$train_id == "train"]
+
+model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
+```
+
+Looking at the coefficients, we see that most of the selected terms are
+1-grams (unigrams) but a few 2-grams (bigrams) show up such as "now !" and
+". call" (call as the start of a sentence).
+
+```{r}
+temp <- coef(model, s = model$lambda[25])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
+
+If you really want to focus on pairs or triples of words, consider removing the
+unigrams. Be careful including too many words, as the model matrix will become
+quite large. In my experience, N-grams do not generally provide a huge
+improvement to the predictive power of lemma-based models. However, they can be
+useful for finding interesting phrases. They will be very useful when we start
+looking at stylometry in a few weeks.
+
+### Skip grams
+
+A skip-gram is similar to an N-gram, however they count combinations of words
+that appear near one another with the possibility of having some terms between
+them. For example, skip-grams with N equal to 2 and a skip of 1 would consist
+of standard 2-grams as well as pairs of words seperated by a third. Here, for
+example is the 2-skip-gram with a skip (k) of 1:
+
+```{r}
+token %>%
+  sm_skip_ngram(n = 2, n_min = 2, k = 1)
+```
+
+As with N-grams, we can use these to construct a TF matrix:
+
+```{r}
+X <- token %>%
+  sm_skip_ngram(n = 2, n_min = 2, k = 1) %>%
+  cnlp_utils_tf(doc_set = spam$doc_id,
+                min_df = 0.005,
+                max_df = 0.5,
+                max_features = 10000,
+                token_var = "token")
+
+dim(X)
+```
+
+And fit a model based on them:
+
+```{r}
+X_train <- X[spam$train_id == "train", ]
+y_train <- spam$class[spam$train_id == "train"]
+
+model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
+```
+
+Note that the model puts the same weight on a pair of words regardless of
+whether the words appear next to one another or seperated by another word.
+Here are the coefficents:
+
+```{r}
+temp <- coef(model, s = model$lambda[15])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
+
+We see several interesting tokens pop up, such as "win £" "£ cash", and
+"to claim". Which do you think are likely skip-grams and which are probably
+plain 2-grams?
+
+### Co-variates
+
+A third way of modifying the model matrix is to include a small set of
+additional features into the matrix along with the word counts. Typically
+these come from additional metadata from our corpus. However, they can also
+come from hand-constructed features from the texts. For example, let's start
+with a set of term frequencies:
+
+```{r}
+X_tf <- token %>%
+  cnlp_utils_tf(doc_set = spam$doc_id,
+                min_df = 0.005,
+                max_df = 0.5,
+                max_features = 10000)
+```
+
+But then, we can add manual counts of the number of capital letters and numbers
+in each text as addition variables and create a model matrix using the
+`model.matrix` function.
+
+```{r}
+mf <- spam %>%
+  mutate(cnt_caps = stri_count(text, regex = "[A-Z]")) %>%
+  mutate(cnt_nums = stri_count(text, regex = "[0-9]")) %>%
+  model.frame(class ~ cnt_caps + cnt_nums, data = .)
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X_cov <- model.matrix(mt, mf)
+```
+
+Then, we combine the two matrices together using the function `cbind`:
+
+```{r}
+X <- cbind(X_cov, X_tf)
+```
+
+Once we have this matrix (which should still be sparse), we can fit the model
+as usual:
+
+```{r}
+X_train <- X[spam$train_id == "train", ]
+y_train <- spam$class[spam$train_id == "train"]
+
+model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
+```
+
+Unsurprisingly, the hand-constructed features show up in the list of
+coefficients:
+
+```{r}
+temp <- coef(model, s = model$lambda[15])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
+
+Also, we see that the predictive power of the model increases compared to the
+word-based only model.
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(class == pred))
+```
+
+Adding additional metadata into the model is an easy way to account for nusiance
+variables and is something we will see in the next project.

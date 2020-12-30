@@ -1,0 +1,344 @@
+---
+title: "Notebook 05: Text Prediction"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+```{r message=FALSE}
+library(tidyverse)
+library(forcats)
+library(ggrepel)
+library(smodels)
+library(glmnet)
+library(Matrix)
+library(magrittr)
+library(stringi)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+options(sparse.colnames = TRUE)
+options(width = 77L)
+```
+
+## Spam Data
+
+Today, we are going to look at our first two data sets containing textual data.
+For both, the classification task will be to distinguish "spam" from "ham". In
+the notes we will look at an older data set of text messages from the UK. The
+lab looks at a collection of email messages. Please note that both contain a
+relatively large amount of inappropriate language, though nothing that you
+would not expect to find in invasive spam messages.
+
+### Data set
+
+To start, we will read the spam data into R and create a training and validation
+split of the data.
+
+```{r, message = FALSE}
+set.seed(1)
+
+spam <- read_csv("data/spam.csv") %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+spam
+```
+
+All of the interesting features that we can use to detect spam are contained
+in the variable `text`, which consists of the message itself. Let's look at a
+few "ham" messages; I will use the `use_series` function in order to display
+the full text in the notebook:
+
+```{r}
+spam %>%
+  filter(class == 0) %>%
+  sample_n(10) %>%
+  use_series(text)
+```
+
+And similarly, here are a random sample of spam messages:
+
+```{r}
+spam %>%
+  filter(class == 1) %>%
+  sample_n(10) %>%
+  use_series(text)
+```
+
+Would you be able to classify these messages manually? Without worrying about
+the specifics, how would you do that?
+
+### Hand-constructing features
+
+In order to use any of the linear models that we have seen so far, we need to
+create numeric predictor variables ("features") from the data set. Often this
+has been only an issue of choosing which existing numeric variables to include
+in our model. Sometimes we needed to do a bit more works, such as using a
+polynomial expansion or indicator variables. When working with text, creating
+the feature variables is much more of an art-form. In fact, it is what we will
+spend much of the rest of the semester focused on.
+
+To start, let's create variables that count the occurrence of some characters
+that might be associated with spam. We will use the function `stri_count` to
+count the number of times the exclamantion mark, the question mark, and the
+pound (currency) symbol occur. We can also use `stri_length` to grab the entire
+length of the message. Here are what the features look like in the data:
+
+```{r}
+spam %>%
+  mutate(
+    length = stri_length(text),
+    num_exclam = stri_count(text, fixed = "!"),
+    num_quest = stri_count(text, fixed = "?"),
+    num_gbp = stri_count(text, fixed = "£")
+  ) %>%
+  select(class, length, num_exclam, num_quest, num_gbp)
+```
+
+Now that we have these features, let's build a logistic regression predicting
+whether a message is spam with them.
+
+```{r, warning = FALSE}
+model <- spam %>%
+  mutate(
+    length = stri_length(text),
+    num_exclam = stri_count(text, fixed = "!"),
+    num_quest = stri_count(text, fixed = "?"),
+    num_gbp = stri_count(text, fixed = "£")
+  ) %>%
+  filter(train_id == "train") %>%
+  glm(
+    class ~ length + num_exclam + num_quest + num_gbp,
+    data = .,
+    family = binomial
+  )
+
+summary(model)
+```
+
+We see that exclamation marks and pound signs are both associated with spam.
+Longer messages also tend to be spam. Question marks are negatively associated
+with spam, though the coefficent is not significant. How well does the model
+do predicting spam:
+
+```{r, warning = FALSE}
+spam %>%
+  mutate(
+    length = stri_length(text),
+    num_exclam = stri_count(text, fixed = "!"),
+    num_quest = stri_count(text, fixed = "?"),
+    num_gbp = stri_count(text, fixed = "£")
+  ) %>%
+  mutate(pred = predict(model, newdata = ., type = "response")) %>%
+  mutate(class_pred = (pred > 0.5)) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(class_pred == class))
+```
+
+It guesses correctly about 80% of the time. The data set was constructed to
+have exactly 50% spam and 50% ham, so a rate of 80% based on just four features
+is actually quite good!
+
+### Tokens and lemmas
+
+We could continue to iteratively guess features to create from our data set
+in order to improve the model. However, it will be much better to try to find a
+way to systematically find the best features that predict the class of the
+message. To do this, we will use the **cleanNLP** package, which will help us
+work with our textual data. We start by loading the package and initalizing
+the **stringi** backend (more on this next time).
+
+```{r}
+library(cleanNLP)
+
+cnlp_init_stringi()
+```
+
+Now, we call the function `cnlp_annotate()` on the spam data and save the
+result (a data frame) as a new variable.
+
+```{r, message=FALSE, warning=FALSE}
+token <- cnlp_annotate(spam, verbose = FALSE)$token
+token
+```
+
+The annotation function creates a data frame with one row for each *token*
+(words and punctuation marks) in the data set. It has many more rows than
+the input dataset. Each token includes an indicator of which document it came
+from, as well as counters for the sentence within the document and the token
+within the sentence. There is also a column called `lemma` that contains a
+version of the token in lower case letters and a column called `upos` that
+indicates if a token is a word ("X") or punctuation mark ("PUNCT").
+
+Let's see some of the most frequent word lemmas in the data:
+
+```{r}
+token %>%
+  filter(upos == "X") %>%
+  group_by(lemma) %>%
+  summarize(sm_count()) %>%
+  arrange(desc(count))
+```
+
+These are all fairly common words or symbols that we would expect to be common
+in text messages.
+
+### Term frequency (TF) matrix
+
+Now, we want to create a model matrix from the detected lemmas. Unlike our
+first attempt that only included a few terms that we manually selected, here
+we will create counts for all of the terms that occur in the data. To do this,
+we use the function `cnlp_utils_tf`. It returns a matrix object with one row
+for each document and only column for each unique lemma in the data. We pass
+the set of documents in order to make sure that the rows of X line up with the
+rows of spam (there can be issues, for example, if we filter the tokens in a
+way that causes a document to have no tokens at all).
+
+```{r}
+X <- cnlp_utils_tf(token, doc_set = spam$doc_id)
+dim(X)
+```
+
+Here, we have 1276 rows (the same as the `spam` data) and 4489 columns (one for
+each unique token). The matrix X is called a *term frequency* matrix; it
+provides the counts of how often each term occurs in each document. To
+understand the matrix, let's look at the first few rows and columns:
+
+```{r}
+X[1:10, 1:24]
+```
+
+The matrix here is slightly different than those that we build with the
+`model.matrix` function; it is a *sparse* matrix, a special way of storing a
+matrix that has a lot of zeros. The zeros as given as dots in the print out.
+Reading the matrix, we see that the first two documents do not use exclamation
+marks, but the third one does. The first document uses three periods, the
+second uses none, and the third uses four.
+
+We can create a training data from the term frequency matrix using the same
+syntax as with a dense matrix. We will create the training response by
+directly grabbing the variable rom the `spam` data.
+
+```{r}
+X_train <- X[spam$train_id == "train", ]
+y_train <- spam$class[spam$train_id == "train"]
+```
+
+And now we can use this data to build a model.
+
+### Penalized regression for text classification
+
+Our model matrix has a very large number of columns. It has, in fact, more
+columns that rows! It is not possible to use a standard linear or logistic
+regression model. However, penalized regression is perfect: it will
+automatically the best variables to use in the model.
+
+The **glmnet** package is able to work directly to sparse matrices, so we can
+run the model just as we did in the previous notebook.
+
+```{r, warning=FALSE}
+model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "binomial")
+```
+
+How well does the model fit the data? It perfectly fits the training data and
+does much better than the previous model with the validation data:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(class == pred))
+```
+
+Perhaps more importantly for us, we can use the selected coefficients to find
+those terms most associated with spam and ham:
+
+```{r}
+mat <- coef(model, s = model$lambda[16])
+mat[apply(mat != 0, 1, any),,drop=FALSE]
+```
+
+There is only one lemma associated with ham: "i" (the personal pronoun I). The
+other terms are all associated with spam. Some seem intuitive, such as "£" and
+"free", others are at first a bit less clear. We will see in the final sections
+several different ways of investigating the model and what it tells us about
+our data.
+
+### Key Words in Context
+
+The key word in context (KWiC) method is used in corpus linguistics to
+understand how certain terms are used in a corpus. This can be useful for
+understanding why certain terms pop up in a predictive model. To run a KWiC
+analysis we will use the `sm_kwic` function. Let's try to figure out why the
+term "to" is associated with spam:
+
+```{r}
+sm_kwic("to", spam$text, n = 20)
+```
+
+And we see that it is often used to describe where some message should be
+sent to. We can do the same with the term "or":
+
+```{r}
+sm_kwic("or", spam$text, n = 20)
+```
+
+And we see that it is used in a few different common constructions such as
+"or stop" or to describe different types of prizes available in a contest.
+
+### Max probability
+
+Another way of investigating a model is to see the documents that have the
+strongest prediction values. That is, those messages that the model thinks
+are most and least likely to be spam. Here are the messages most likely to
+be spam:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "response")) %>%
+  arrange(desc(pred)) %>%
+  slice_head(n = 10) %>%
+  use_series(text)
+```
+
+And these are the messages most likely to be ham:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "response")) %>%
+  arrange(pred) %>%
+  slice_head(n = 10) %>%
+  use_series(text)
+```
+
+Can you identify any interesting patterns here?
+
+### Negative Examples
+
+Similarly, we can try to look at "negative examples", those messages that are
+incorrectly predicted by the model. Here are the negative examples that are
+ham but classified as spam:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  filter(pred != class) %>%
+  filter(class == 0) %>%
+  use_series(text)
+```
+
+Do you notice anything interesting here? How about with the spam messages
+incorrectly classified as ham:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  filter(pred != class) %>%
+  filter(class == 1) %>%
+  use_series(text)
+```
+
+In this case there were few enough negative examples to look at them all. In the
+case of more difficult prediction tasks, you may want to look at only those
+negative examples that have a relatively extreme predicted probability.

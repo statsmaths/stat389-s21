@@ -1,0 +1,25 @@
+---
+title: "Project 02"
+output: html_document
+---
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+```
+
+# Project 1
+
+The project instructions are linked to from the course website. This is just a
+template file to give you a space to work on the project. Start by running the
+code block above, and then use as many blocks below as needed to read in the
+dataset and create your graphic.
+
+```{r}
+
+```

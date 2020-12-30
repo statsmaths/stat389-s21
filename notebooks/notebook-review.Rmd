@@ -1,0 +1,398 @@
+---
+title: "Using R to Manipulate and Visualize Data"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+## Introduction
+
+My statistical learning course (MATH389) is in many ways a natural extension of
+the way  that I teach Introduction to Data Science (MATH289). I recognize that
+many students this semester, however, may have taken 289 with a different
+instructor in a previous year or have come through one of the alternative
+prerequisites. The course should be accessible to anyone with previous
+experience writing code to analyze data, provided that one is prepared to put
+in a bit of work at the start of the semester to fill in any gaps of knowledge.
+
+These notes provide a starting point for getting up to speed with the specific
+material covered in 289. They give an overview of some of the R functions we
+will be working with this semester. The notes assume that you have had some
+previous exposure to writing code, but no particular exposure to R. For example,
+perhaps you have used Python in an introductory CS course of Matlab in a
+mathematics course. Even if you have used R in other courses, it is quite
+possible that you have not used the specific functions and approaches mentioned
+here, so please review these notes carefully.
+
+There is no way that these notes will completely substitute for all of the
+detail that we go into in MATH289, Introduction to Data Science. However, they
+should give a good baseline from which to understand the code that we will
+develop throughout the course. For more information, I recommend that you check
+out:
+
+- [MATH289 Course Notes](https://statsmaths.github.io/stat289-f20/index.html)
+- [R for Data Science Textbook](https://r4ds.had.co.nz/)
+
+I make references to both of these in several points throughout these notes
+as topics arise. I am always happy to answer questions about specific functions
+or approaches being used in the course notes.
+
+### Installation
+
+The R programming language and all of the third-party packages that we will
+use during the semester is free and open-source. As a class, we will walk
+through the steps to install the language and needed components on your machine
+during the first course meeting. In the event of difficulties, we have a
+subscription to a cloud-based alternative that you are able to make use of.
+For now, I recommend just reading and understanding the code described here.
+There will be plenty of time to practice the material once the semester begins.
+
+If the entire concept of writing and running scripting code seems foreign to
+you, I suggest reading chapters 1 and 4 of the R for Data science book, which
+is freely available here:
+
+- [Chapter 1 – Introduction](https://r4ds.had.co.nz/introduction.html)
+- [Chapter 4 – Workflow: Basics](https://r4ds.had.co.nz/workflow-basics.html)
+
+In the case that these chapters seem to be moving too fast, which is hopefully
+not the case, I recommend contacting me to assess whether 389 is an appropriate
+course based on your background.
+
+### Setup
+
+Usually, the first we do when running R code is to load third-party extensions
+called *packages*. These provide additional functions that make working with
+data easier and more consistent than using build-in function. Here are three
+packages that I tend to use in my data analysis work:
+
+```{r message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+```
+
+Next, we typically need to set some parameters that change the default values
+for common functions. Here are three that I also typically include, that
+change the way that plots, output, and data summaries are performed:
+
+```{r message=FALSE}
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+options(width = 77L)
+```
+
+Typically in class, I will include all of the packages and default settings
+that you need for an analysis.
+
+### Loading and Viewing Datasets
+
+After loading the R libraries and setting up our work space, the next step is
+to load in some data. Here, we load a csv file into R and store the data set
+as an R object named `food`. Notice that R uses the arrow sign (`<-`) to
+assign the output of one function to a variable name.
+
+```{r, message = FALSE}
+food <- read_csv(file.path("data", "food.csv"))
+```
+
+The food data set contains information about various food items, with one row
+for each item of food (we call these observations) and one column for each
+thing that we know about the food items (we call these features). Running a
+line of code with just the name of the data set prints out the first few rows
+and columns of the data. Additional feature names are given at the bottom of
+the output.
+
+```{r}
+food
+```
+
+Notice that the each of the columns has a unique name. For this class, we will
+use the convention that all column and variable names use a combination of
+lower-case letters, underscores, and numbers. This will helps keep our code neat
+and easy to follow.
+
+## Manipulating Data
+
+### Data Verbs
+
+A common task in data analysis is manipulating an existing data set. In R, we
+will often do this through the use of data verbs. These are functions that
+take one version of a data set and return a modified version of the data set.
+They always work on a copy of the data. Often we want to apply a sequence of
+data verbs one after another. To make this easy, and avoid the need to create
+temporary variables, we can use the pipe operator `%>%`, which passes the
+output of one line into the first argument of the next.
+
+It is probably more intuitive to see an example of data verbs and the pipe
+operator, rather than trying to overly-describe the way it functions. As an
+example, here is a chain of operators that first **filters** the data to include
+only those rows where the food group various indicates a fruit and then
+**arranges* the data from the smallest to the largest value of sodium.
+
+```{r}
+food %>%
+  filter(food_group == "fruit") %>%
+  arrange(sodium)
+```
+
+Other common verbs include the **mutate** verb, which creates new variables
+as a function of the existing variables, and the **select** verb which selects
+a subset of the existing columns. Here, we compute the percentage of calories
+that are from fat (there are 9 calories in 1 gram of fat), arranges the
+data in descending order by the percentage of calories that are from fat, and
+then selects only the relevant variables.
+
+```{r}
+food %>%
+  mutate(calories_fat_perc = total_fat * 9 / calories * 100) %>%
+  arrange(desc(calories_fat_perc)) %>%
+  select(item, total_fat, calories, calories_fat_perc)
+```
+
+Inside of the filter function you can use a number of different logical
+operators, such as `>`, `<`, `>=`, `<=`, `!=` (not equal), `%in%`
+(set containment), `&` (and), and `|` (or). And inside of the mutate function,
+an array of different mathematical operators can be applied, such as `sqrt()`,
+`sin()`, and `abs()`.
+
+### Summarizing Data
+
+Another data manipulation verb that deserves special attention is the
+**summarize** command. By default, it summarizes all of the rows of a data set
+in a single line by applying *summary functions* to columns of the data. For
+example, here is the code to take the average (mean) value of three of the
+variables in the food data:
+
+```{r}
+food %>%
+  summarize(sm_mean(calories), sm_mean(total_fat), sm_mean(sat_fat))
+```
+
+Notice that only the new variables are included in the output.
+
+The real power of the summary function comes by grouping the data by one or
+more variables prior to running the summary command. The summary function will
+then be applied only *within* each unique value of the grouping variable(s),
+with one row for each unique value. Here is the code to compute the same
+summaries for each food group:
+
+```{r}
+food %>%
+  group_by(food_group) %>%
+  summarize(sm_mean(calories), sm_mean(total_fat), sm_mean(sat_fat))
+```
+
+There are number of other summary functions that we will occasionally need,
+such as `sm_min()`, `sm_median`, `sm_quantiles()`, `sm_count()`, and `sm_cor()`.
+It is also possible to use a format similar to the mutate function, where the
+summary function and new variable names are explicitly defined.
+
+More information about data verbs and data grouping can be found in
+[Chapter 5](https://r4ds.had.co.nz/transform.html) of the R for Data Science
+textbook and in
+[Notebook 4](https://statsmaths.github.io/stat289-f20/notebooks/notebook04.html),
+[Notebook 5](https://statsmaths.github.io/stat289-f20/notebooks/notebook05.html),
+and
+[Notebook 6](https://statsmaths.github.io/stat289-f20/notebooks/notebook06.html)
+of my Introduction to Data Science course.
+
+
+### Combining Data: Two-table Verbs
+
+All of the data verbs above work by taking a single data table as and input
+and returning a modified copy of the data as an output. The other class of
+data verbs that we will use allow us to combine information from two different
+data tables. These are called *two-table verbs*. To show an example of these,
+let's load another dataset of recipes showing the ingredients for two dishes.
+
+```{r, message=FALSE}
+recipes <- read_csv(file.path("data", "food_recipes.csv"))
+recipes
+```
+
+We might want to combine this data with the food data to see, for example, how
+many calories are in each dish. We do this with the `inner_join` function, which
+allows us to combine two data sets by joining along a common key variable (here,
+the food name).
+
+```{r}
+recipes %>%
+  inner_join(food, by = c("ingredient" = "item"))
+```
+
+All of the food nutritional facts are given for a 100g serving; the recipes
+give amounts in grams. With this knowledge, we can put together the verbs from
+the previous sections to compute the amount of calories in each dish:
+
+```{r}
+recipes %>%
+  inner_join(food, by = c("ingredient" = "item")) %>%
+  mutate(calories_total = (calories / 100) * amount) %>%
+  group_by(recipe) %>%
+  summarize(sm_sum(calories_total))
+```
+
+Another two-table verb is `left_join`, which works exactly the same but includes
+rows that only exist in the first table. Notice the difference here, with the
+row containing the bay leaf (which is not present in the food dataset) included
+in the output:
+
+```{r}
+recipes %>%
+  left_join(food, by = c("ingredient" = "item"))
+```
+
+There are also the variations `right_join` and `full_join` which include
+missing keys in the second data set and missing keys in both data sets,
+respectively. Finally, the functions `semi_join` and `anti_join` identify rows
+that have matching values in the two data sets, but do not actually perform
+any joining together of the data columns. These will be useful in some text
+analysis tasks.
+
+More information about combining data sets based on common key variables can
+be found in
+[Chapter 12](https://r4ds.had.co.nz/tidy-data.html) and
+[Chapter 13](https://r4ds.had.co.nz/relational-data.html)
+of the R for Data Science
+textbook and in
+[Notebook 9](https://statsmaths.github.io/stat289-f20/notebooks/notebook09.html)
+of my Introduction to Data Science course.
+
+## Visualization
+
+### Scatterplots
+
+Another major task in data analysis is producing visualizations of data. For
+this, we will use a system called the Grammar of Graphics. It requires a bit
+of work to create simple plots, but can be extending in a logical way to capture
+almost any kind of plot you would want to make with your data.
+
+To start, let's see how to draw a scatter plot of our food data. Each row of
+the data will be draw as a dot, with the x-coordinate given by the sugar content
+of the food and the y-axis given by the number of calories in the food item.
+This requires specifying three elements in the grammar of graphics:
+
+- the data set (`food`)
+- the type of *geometry* (points: `geom_point`)
+- the x and y *aesthetics* (x: `sugar`, y: `calories`)
+
+The syntax for doing this in R is:
+
+```{r}
+food %>%
+  ggplot() +
+    geom_point(aes(x = sugar, y = calories))
+```
+
+We can specify additional aesthetics that describe the way the points are
+plotted by mapping these to other variables in the data. R will take care of
+the details for us. For example, we can specify that the color of the points
+should change based on the item's food group:
+
+```{r}
+food %>%
+  ggplot() +
+    geom_point(aes(x = sugar, y = calories, color = food_group))
+```
+
+Notice that R has figured out what colors to use and how to map them to each
+unique value of the food group variable. Aesthetics can also be assigned to
+different fixed values as follows (note that these arguments go outside of the
+`aes()` function):
+
+```{r}
+food %>%
+  ggplot() +
+    geom_point(aes(x = sugar, y = calories), color = "salmon", size = 4)
+```
+
+Resources for additional geometry types, aesthetics, and ways of further
+customizing graphics are given at the end of the following section.
+
+### Layering Graphics
+
+In order to make more complex plots, we can layer multiple geometries together
+by literally adding them together with the plus sign. For example, we can add
+a text-repel layer to the plot that labels some of the items with labels (the
+term repel indicates that the label will be made to avoid intersecting the point
+and other labels). This geometry requires specifying the *label* aesthetic to
+indicate which variable is used to provide the label.
+
+```{r, warning = FALSE}
+food %>%
+  ggplot() +
+    geom_point(aes(x = sugar, y = calories)) +
+    geom_text_repel(aes(x = sugar, y = calories, label = item))
+```
+
+We can further modify the plot by creating a dataset of just the fruits and
+labeling only the fruits (but including points for all of the layers). We do
+this by manually specifying the data argument to the geometry layer. We will
+also simplify the code by specifying the x- and y-aesthetics once in the
+`ggplot()` function (it becomes the default for subsequent layers).
+
+```{r, warning = FALSE}
+fruit <- food %>%
+  filter(food_group == "fruit")
+
+food %>%
+  ggplot(aes(x = sugar, y = calories)) +
+    geom_point() +
+    geom_text_repel(aes(label = item), data = fruit)
+```
+
+A more complete plot can be created by layering two sets of points and a
+text-repel layer along with custom color names.
+
+```{r, warning = FALSE}
+food %>%
+  ggplot(aes(x = sugar, y = calories)) +
+    geom_point(color = "grey85") +
+    geom_point(color = "navy", data = fruit) +
+    geom_text_repel(aes(label = item), color = "navy", data = fruit)
+```
+
+This begins to show how relatively simple elements can be combined to produce
+a nearly limitless set of increasingly complex data visualiations that help
+explore the structure of our data.
+
+More information about data visualization in R can be found in
+[Chapter 3](https://r4ds.had.co.nz/data-visualisation.html)
+of the R for Data Science textbook and in
+[Notebook 2](https://statsmaths.github.io/stat289-f20/notebooks/notebook02.html),
+[Notebook 3](https://statsmaths.github.io/stat289-f20/notebooks/notebook03.html),
+and
+[Notebook 8](https://statsmaths.github.io/stat289-f20/notebooks/notebook08.html)
+of my Introduction to Data Science course.
+
+## Additional Notes
+
+### Coding Style Guidelines
+
+It is very important to properly format your code in a consistent way.
+Even though the code may run without errors and produce the desired results,
+you will make your life easier by writing well-formatted code from the start.
+This makes it easier to read and debug in the future. We will follow the
+following guidelines:
+
+- always put one space before and after an equals sign or assignment arrow
+- always put one space around mathematical operations (such as `+` and `*`)
+- always put one space after a comma, but no space before a comma
+- variable names should only use lower-case letters, numbers, and underscores
+- indent every line that follows a pipe with two extra spaces
+- indent every line below `ggplot` by an additional two spaces (four total)
+
+As with our original set of style guidelines, you will make your life a lot
+easier if you get used to these rules right from the start.
+
+### Continued Study
+
+The material in these notes gives an overview of topics that are usually covered
+over 4-5 weeks in MATH209 and/or MATH289. I do not expect anyone to completely
+understand the implications and mechanics of these techniques on a first pass.
+If the material is new to you, I suggest returning to these notes frequently
+through the first few weeks of the semester as we encounter these methods in
+our analysis of large textual corpora. As time allows, I suggest also following
+the links to the course materials and the R for Data Science textbook.

@@ -1,0 +1,417 @@
+---
+title: "Notebook 02: Creating the Model Matrix"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+```{r message=FALSE}
+library(tidyverse)
+library(forcats)
+library(ggrepel)
+library(smodels)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+options(width = 77L)
+```
+
+## Predicting Bike Usage
+
+Today, we will look at a data set of bike sharing usage in Washington, DC.
+Our task is to predict how many bikes are rented each day. As we saw in the
+previous set of notes, it will be useful to split the data set into training
+and validation sets. We will do this right as the data is read into R.
+
+```{r, message = FALSE}
+set.seed(1)
+
+bikes <- read_csv("data/bikes.csv") %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+bikes
+```
+
+### Non-linear relationships
+
+The data comes from two different years. There was an overall increase in usage
+during the second year, so it is useful to start by looking at just the second
+year (we will see how to incorporate both together in just a moment). Here is a
+plot that investigates the relationship between the maximum daily temperature
+(degrees Celsius) and the number of bikes that are rented.
+
+```{r}
+bikes %>%
+  filter(year == "two") %>%
+  ggplot(aes(temp, count)) +
+    geom_point()
+```
+
+Generally, people are more willing to rent bikes when the weather is warmer.
+However, the usage drops a bit when the temperatures are too high. The peak
+usage visually seems to be right around 20-25°, which is right around the
+optimal temperature for a bike ride.
+
+We will start by building a linear model between the temperature and the bike
+usage in year two. Rather than worrying about the RMSE, we will start by just
+visually inspecting the results.
+
+```{r}
+model <- bikes %>%
+  filter(year == "two") %>%
+  filter(train_id == "train") %>%
+  lm(count ~ temp, data = .)
+
+bikes %>%
+  filter(year == "two") %>%
+  mutate(score_pred = predict(model, newdata = .)) %>%
+  ggplot(aes(temp, count)) +
+    geom_point() +
+    geom_line(aes(y = score_pred), color = "orange", size = 1.5)
+```
+
+The best fit line seems to over-predict usage at very low temperatures and
+very high temperatures. We already noted that the relationship is not a linear
+one, so it is not surprising that linear regression line fails to match the
+data for all temperature values.
+
+You might think that we need an entirely different kind of model to deal with
+this data. After all, we have a non-linear relationship, so how can we use a
+linear model? It turns out, helpfully, that this is in fact not the case because
+linear models are only constrained to be linear in the sense that the unknown
+coefficients must be linearly related to the output. However, we can create
+additional predictor variables to fit high order relationships. For example,
+we can fit the following model to predict a quadratic relationship between
+x and y:
+
+$$ Y_i = \alpha + \beta_1 X_{i} + \beta_2 X_{i}^2 + \epsilon_i  $$
+
+In other words, we have converted a non-linear model with one variable into a
+linear model with two variables. Let's see how this could work in R by creating
+a temporary variable of the squared temperature:
+
+```{r}
+model <- bikes %>%
+  filter(year == "two") %>%
+  filter(train_id == "train") %>%
+  mutate(temp_sq = temp^2) %>%
+  lm(count ~ temp + temp_sq, data = .)
+
+bikes %>%
+  filter(year == "two") %>%
+  mutate(temp_sq = temp^2) %>%
+  mutate(score_pred = predict(model, newdata = .)) %>%
+  ggplot(aes(temp, count)) +
+    geom_point() +
+    geom_line(aes(y = score_pred), color = "orange", size = 1.5)
+```
+
+Now, the model fits the data much more accurately at the extreme temperature
+values. An alternative way of fitting the same model without having to worry
+about manually constructing a new variable of squares is through the `poly()`
+function. It does all of the work for us; while in theory it produces the same
+fit as the code above, it does so using a more numerically stable algorithm.
+
+```{r}
+model <- bikes %>%
+  filter(year == "two") %>%
+  filter(train_id == "train") %>%
+  lm(count ~ poly(temp, degree = 2), data = .)
+
+bikes %>%
+  filter(year == "two") %>%
+  mutate(score_pred = predict(model, newdata = .)) %>%
+  ggplot(aes(temp, count)) +
+    geom_point() +
+    geom_line(aes(y = score_pred), color = "orange", size = 1.5)
+```
+
+The `poly` function can be used to fit higher-order interactions by increasing
+the degree of the polynomial.
+
+```{r}
+model <- bikes %>%
+  filter(year == "two") %>%
+  filter(train_id == "train") %>%
+  lm(count ~ poly(temp, degree = 5), data = .)
+
+bikes %>%
+  filter(year == "two") %>%
+  mutate(score_pred = predict(model, newdata = .)) %>%
+  ggplot(aes(temp, count)) +
+    geom_point() +
+    geom_line(aes(y = score_pred), color = "orange", size = 1.5)
+```
+
+Here, the fifth-order polynomial does a better job of capturing the extreme
+tails of the data: a smaller slope for very low temperatures and a sharper
+one for high temperatures.
+
+### Indicator variables
+
+Now, let's try to get a handle on the two different years of the data. Drawing
+the temperature-count relationship with both years shows the large increase
+in usage from year one to year two.
+
+```{r}
+bikes %>%
+  ggplot(aes(temp, count)) +
+    geom_point(aes(color = year), alpha = 0.5)
+```
+
+We can also model this relationship with a linear model by constructing another
+new variable called an *indicator variable*. This variable takes on only two
+values: 0 or 1. It is defined to be one in year two and zero otherwise. If we
+call this variable Z, we can think of our linear model being:
+
+$$ Y_i = \alpha + \beta_1 X_{i} + \beta_3 Z_{i} + \epsilon_i  $$
+
+Constructing this variable manually, we can create a model in R with the
+following:
+
+```{r}
+bikes %>%
+  mutate(yeartwo = if_else(year == "two", 1, 0)) %>%
+  filter(train_id == "train") %>%
+  lm(count ~ temp + yeartwo, data = .) %>%
+  summary()
+```
+
+The coefficient for the `yeartwo` variable (2103.58) gives the increase in bikes
+rented on average between year one and year two after accounting for the
+temperature variable. As with the polynomial expansion in the previous section,
+we can let R handle the creation of the indicator variable by just adding the
+year variable in to the R formula.
+
+```{r}
+bikes %>%
+  filter(train_id == "train") %>%
+  lm(count ~ temp + year, data = .) %>%
+  summary()
+```
+
+Plotting the model now shows that the predictions are given by two parellel
+lines.
+
+```{r}
+model <- bikes %>%
+  filter(train_id == "train") %>%
+  lm(count ~ temp + year, data = .)
+
+bikes %>%
+  mutate(score_pred = predict(model, newdata = .)) %>%
+  ggplot(aes(temp, count)) +
+    geom_point(aes(color = year), alpha = 0.5) +
+    geom_line(aes(y = score_pred, color = year), size = 1.5)
+```
+
+We can, of course, combine this with the polynomial expansion to have two
+polynomials with different intercepts.
+
+```{r}
+model <- bikes %>%
+  filter(train_id == "train") %>%
+  lm(count ~ poly(temp, 5) + year, data = .)
+
+bikes %>%
+  mutate(score_pred = predict(model, newdata = .)) %>%
+  ggplot(aes(temp, count)) +
+    geom_point(aes(color = year), alpha = 0.5) +
+    geom_line(aes(y = score_pred, color = year), size = 1.5)
+```
+
+Sometimes it can even be useful to have different slopes for the two lines. To
+do this, we multiply the two variables together in the model formula.
+
+```{r}
+model <- bikes %>%
+  filter(train_id == "train") %>%
+  lm(count ~ temp * year, data = .)
+
+bikes %>%
+  mutate(score_pred = predict(model, newdata = .)) %>%
+  ggplot(aes(temp, count)) +
+    geom_point(aes(color = year), alpha = 0.5) +
+    geom_line(aes(y = score_pred, color = year), size = 1.5)
+```
+
+### Indicator variables: Three or more categories
+
+Finally, the approach above works equally well when we have a variable with
+more than two categories. The R syntax and the geometric interpretation
+extend as you would expect. For example, if we use the weather variable,
+which has three categories (Dry, Rain, and Snow) we now have three parallel
+curves:
+
+```{r}
+model <- bikes %>%
+  filter(train_id == "train") %>%
+  lm(count ~ poly(temp, 5) + weather, data = .)
+
+bikes %>%
+  mutate(score_pred = predict(model, newdata = .)) %>%
+  ggplot(aes(temp, count)) +
+    geom_point(aes(color = weather), alpha = 0.2) +
+    geom_line(aes(y = score_pred, color = weather), size = 1.5)
+```
+
+Unsurprisingly, rain decreases usage a bit and snow decreases significantly.
+Under the hood, R is created two indicator variables, one an indicator for Rain
+and the other for Snow. The details are important if you want to do statistical
+inferences, but the visualization is sufficent for understanding the concept
+from a predictive perspective.
+
+## Linear Models with Matrices
+
+### Matrix Formulation
+
+We have been working with multivariate linear models with several variables,
+though I have only ever written the formal equation in the case where there
+are two explanatory variables. In general, multivariate regression represents
+the following model:
+
+$$y_i = x_{1,i} \beta_1 + x_{2,i} \beta_2 + \cdots + x_{1,p} \beta_p + \epsilon_i$$
+
+For simplicity, we won't include an explicit intercept term in
+the model. If we want one, we will just make the first variable $x_{1,i}$
+equal to one for every value of i.
+
+The statistical estimation problem is to estimate the p
+components of the multivariate vector beta.
+
+Using the notation of matrix multiplication, we can write the linear model
+simultaneously for all observations:
+
+$$ \left(\begin{array}{c}y_1\\ y_2\\ \vdots\\ y_n\end{array}\right) =
+  \left(\begin{array}{cccc}x_{1,1}&x_{2,1}&\cdots&x_{p,1}\\
+                           x_{1,2}&\ddots&&x_{p,2}\\
+                           \vdots&&\ddots&\vdots\\
+                           x_{1,n}&x_{2,n}&\cdots&x_{p,n}\\\end{array}\right)
+  \left(\begin{array}{c}\beta_1\\ \beta_2\\ \vdots\\ \beta_p\end{array}\right) +
+  \left(\begin{array}{c}\epsilon_1\\ \epsilon_2\\ \vdots\\ \epsilon_n\end{array}\right) $$
+
+
+Which can be compactly written as:
+
+$$ y = X \beta + \epsilon $$
+
+The matrix X is known as the **design matrix** or **model matrix**.
+
+## Fitting Linear Models with Matricies
+
+Note that the bikes data, like every other data set we have used,
+is not a matrix. It is something that R calls a **data frame**:
+
+```{r}
+class(bikes)
+```
+
+While both matrices and data frames have data organized in rows and
+columns, matrices force all of the data to be numeric (its actually
+more complicated than this in R, but just go along with it for now).
+A data frame on the other hand can have different variable types in
+each column.
+
+The formula interface to `lm` is incredibly useful when using
+categorical variables or when processing numeric variables by special
+functions such as `poly`. The functions `model.frame` and `model.matrix`
+allow us to compute the model matrix from the formula interface. In fact, the
+`lm` function calls these to convert our inputs into a model matrix. The
+output of this is then passed to `lm.fit`. It will also, by
+default, include an intercept term for us. Here we use it
+to build a model matrix as before:
+
+```{r}
+mf <- model.frame(count ~ temp +  humidity , data = bikes)
+mt <- terms(mf)
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
+
+head(X)
+```
+
+Notice that the intercept has been added for us. What is nice about this
+formulation is that we can use commands like `poly` and categorical
+variables and have R take care of all the hard work for us:
+
+```{r}
+mf <- model.frame(count ~ temp + weather, data = bikes)
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
+
+head(X)
+```
+
+We can then create a specific training set using the following syntax:
+
+```{r}
+X_train <- X[bikes$train_id == "train", ]
+y_train <- y[bikes$train_id == "train"]
+```
+
+We will find that many of the more complex algorithms for fitting models in
+R require the user to produce a model matrix before passing the data to the
+statistical learning algorithm.
+
+## Using lm.fit
+
+We have seen how to use the `lm` function to quickly fit
+linear regression directly from data frames. Now, how do
+we actually fit a linear model once we have these matrices?
+Next class we will see how to do this directly with matrix
+operations. There is an intermediate function that solves the
+linear regression problem directly from our matrices called
+`lm.fit`. In fact, the `lm` function internally calls this function.
+As inputs, it takes just the X matrix and response y. There
+is a lot of diagnostic output, but we will take just the
+`coef` component, corresponding to the coefficients matrix:
+
+```{r}
+beta <- lm.fit(X_train, y_train)$coef
+beta
+```
+
+We can create predicted values for the whole data set by matrix
+multiplying `X` with `beta`:
+
+```{r}
+bikes %>%
+  mutate(count_pred = X %*% beta) %>%
+  select(count, count_pred)
+```
+
+Let's verify that this gives the same output as the `lm` function:
+
+```{r}
+bikes %>%
+  filter(train_id == "train") %>%
+  lm(count ~ temp + weather, data = .) %>%
+  summary()
+```
+
+And, as hoped, it does!
+
+Generally, it is recommended to us the `lm` function directly if your goal is
+just to produce a linear regression model. Creating a model matrix is a useful
+process to know, however, as we move towards more complex learning methods.
+
+### Direct computation (optional)
+
+Some of you may have taken a class where you derived the analytic form of the
+linear regression estimator. It is sometimes shown in a linear algebra class or
+advanced econometrics course. We can compactly write the estimator as the
+following matrix product:
+
+$$ \hat{\beta} = (X^t X)^{-1} X^t y $$
+
+And sure enough, this is the same solution given by the `lm` and `lm.fit`
+functions:
+
+```{r}
+solve(crossprod(X_train), crossprod(X_train, y_train))
+```
+
+We will explore the use of matrix products later in the semester when we look
+at PCA and spectral clustering.

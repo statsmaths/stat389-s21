@@ -1,0 +1,477 @@
+---
+title: "Notebook 04: Penalized Regression"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+```{r message=FALSE}
+library(tidyverse)
+library(forcats)
+library(ggrepel)
+library(smodels)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+options(width = 77L)
+```
+
+
+## City Tempurature Data
+
+Today we will start by looking at a small data set of temperatures
+from 327 cities across the world.
+
+```{r, message = FALSE}
+temps <- read_csv("data/city_temps_yr.csv")
+temps
+```
+
+Our goal is to predict the average daily high temperature for the
+month of May using the average daily temperatures for the other
+eleven months of the year. This is not particularly hard but will
+be a great illustration of linear regression regularization.
+
+### Ordinary regression
+
+We can start by predicting the average daily high in May as a
+function of all of the other eleven months:
+
+```{r}
+model <- lm(may ~ jan + feb + mar + apr + jun + jul + aug + sep +
+                  oct + nov + dec, data = temps)
+summary(model)
+```
+
+We can understand these coefficients best by plotting them over the
+course of the year:
+
+```{r}
+tibble(month = names(coef(model)[-1]), val = coef(model)[-1]) %>%
+  ggplot(aes(factor(month, levels = tolower(month.abb)), val)) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_path(aes(group = 1), size = 1) +
+    geom_point(size = 3) +
+    theme_minimal() +
+    scale_x_discrete(breaks = tolower(month.abb)) +
+    xlab("Month") + ylab("Coefficent")
+```
+
+As you might expect, April and Jun have the largest coefficents.
+You may not have thought that other months would have negative
+weights. What is going on here? These variables have fairly high
+correlations, so we can get a fairly predictive model by combining
+positive weights on some variables and negative weights on others.
+
+### An analogy
+
+In the article "The relationship between jaw, arm and leg size in
+three ethnic groups" (DOI: 10.1002/aja.1001360211), it is established
+that the length of the average human leg is roughly 20% larger than
+the length of their arms. We know that the length between someone's
+left arm and their right arm are very highly correlated (virtually
+the same, depending on your precision). If we collected data and
+tried to predict the length of left legs as a function of right arms
+and left arms we would have several different choices that seem
+to given essentially the same fit.
+
+We could put all of the model weight on the left arm:
+
+$$ \text{left_leg} = \text{left_arm} \cdot 1.2 + \text{right_arm} \cdot 0.0 $$
+
+All on the right arm:
+
+$$ \text{left_leg} = \text{left_arm} \cdot 0.0 + \text{right_arm} \cdot 1.2 $$
+
+Split it between both arms:
+
+$$ \text{left_leg} = \text{left_arm} \cdot 0.6 + \text{right_arm} \cdot 0.6 $$
+
+Or, do something quite a bit more complex:
+
+$$ \text{left_leg} = \text{left_arm} \cdot 101.2 - \text{right_arm} \cdot 100 $$
+
+If our measurements for left arms and right arms were *exactly* the same,
+there would be no way of distinguishing this infinite set of choices. This
+would then be a *rank deficent* model. If just one person has a different
+left and right arm measurment (perhaps an old injury or we are using very
+precise measuring tool), there will be a best model in the ordinary least
+squares sense. However, this may not match what the best model should be
+for future predictions.
+
+### Regularization: Ridge regression
+
+The tendency of linear regression to overfit the data in the presense of
+highly-correlated variables or sets of variables is a major issue in
+predictive modelling. So far our only option has been to control this
+by limiting the number of variables in a model, either directly or by
+limiting the number of interactions or basis expansion terms.
+
+Regularization is a more direct approach to limiting the complexity of
+a model. Ridge regression solves this problem by modifying the ordinary
+least squares optimization task. It add a penalty term that penalizes
+the model for having coefficents that are too large. Specifically, we
+have:
+
+$$ \widehat{\beta}_{ridge} \in \arg\min \left\{\frac{1}{2n} \cdot || y - X \beta||_2^2 + \lambda \cdot || \beta ||_2^2, \quad b \in \mathbb{R}^p \right\}, \quad \lambda > 0 $$
+
+Where
+
+$$ || a ||_2^2 = \sum_i a_i^2 $$
+
+The tuning parameter lambda sets the level of penalization. If
+lambda is very large, the best model will have no coefficents.
+As lambda approaches zero, the ridge vector will limit towards
+the ordinary least squares solution. The term in from of the
+sum of squares makes such that lambda does not have to scale
+with the sample size (the sum of squares growns with larger
+samples). It is the same reason we use RMSE instead of MSE to
+compare our models.
+
+The **glmnet** package provides a function for fitting the ridge
+regression model. It requires that we provide a matrix form of
+our data.
+
+```{r}
+mf <- model.frame(may ~ jan + feb + mar + apr + jun + jul + aug + sep +
+                  oct + nov + dec -1, data = temps)
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
+```
+
+To run ridge regression, we will use the function `cv.glmnet` and
+set `alpha` equal to zero. I want us to understand what this model
+is doing before returning to some of the details later today.
+
+```{r, message = FALSE}
+library(glmnet)
+model <- cv.glmnet(X, y, alpha = 0)
+```
+
+The output vector is given in a different type of R object than
+from the `lm` function, but the printed output looks similar:
+
+```{r}
+coef(model)
+```
+
+Let's plot this again:
+
+```{r}
+tibble(month = rownames(coef(model))[-1], val = coef(model)[-1]) %>%
+  ggplot(aes(factor(month, levels = tolower(month.abb)), val)) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_path(aes(group = 1), size = 1) +
+    geom_point(size = 3) +
+    theme_minimal() +
+    scale_x_discrete(breaks = tolower(month.abb)) +
+    xlab("Month") + ylab("Coefficent")
+```
+
+Now, the weights are all positive and spread out over the
+course of the year. There is still, however, a peak near
+April and June. What has happened is two fold: the penalty
+as made it "not worth" making offsetting negative weights
+and positive weights even if this slightly decreases the
+RMSE. The penalty is simply too great. Secondly, the
+ridge penalty in particular prefers many small weights
+compared to a few larger weights. That is why the values
+are spread throughout the year.
+
+In our leg length example, ridge regression would strongly
+prefer this:
+
+$$ \text{left_leg} = \text{left_arm} \cdot 0.6 + \text{right_arm} \cdot 0.6 $$
+
+The squared size of these values is only 0.36, compared to the
+size of 1.44 for having the full weight on only one of the two
+variables.
+
+### Regularization: Lasso regression
+
+There are other ways of penalizing the size of the regression
+vector by replacing the sum of squares term with other penalties.
+Lasso regression replaces the sum of squares with the sum of
+absolute values:
+
+$$ \widehat{\beta}_{ridge} \in \arg\min \left\{\frac{1}{2n} \cdot || y - X \beta||_2^2 + \lambda \cdot || \beta ||_1, \quad b \in \mathbb{R}^p \right\}, \quad \lambda > 0 $$
+
+Where
+
+$$ || a ||_1 = \sum_i | a_i | $$
+
+The behavior of the lasso regression has a very special property
+that can be extremely useful in predictive modeling. We can apply
+it using the `cv.glmnet` function by setting `alpha` to 1.
+
+```{r, message = TRUE}
+model <- cv.glmnet(X, y, alpha = 1)
+```
+
+Plotting the coefficents again, we see the special behavior of
+the lasso regression in action:
+
+```{r}
+tibble(month = rownames(coef(model))[-1], val = coef(model)[-1]) %>%
+  ggplot(aes(factor(month, levels = tolower(month.abb)), val)) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_path(aes(group = 1), size = 1) +
+    geom_point(size = 3) +
+    theme_minimal() +
+    scale_x_discrete(breaks = tolower(month.abb)) +
+    xlab("Month") + ylab("Coefficent")
+```
+
+The model has made every weight other than April and June set
+to exactly zero. As with ridge regression, the penalty is too
+great to make canceling negative weights and postive weights.
+Unlike ridge regression, the lasso penalty does not prefer
+many small weights to fewer large weights. Therefore, the model
+will pick only those variables which are most strongly correlated
+with the response; here, these are April and June.
+
+The magic of lasso regression is that it sets many terms exactly
+to zero. This is accomplished because the absolute value does not
+have a derivative at zero. Therefore, the target function has
+many critical points where beta coefficents are equal to zero
+and a non-zero chance of setting any beta value to zero.
+
+Which model would the lasso regression prefer in our left leg
+prediction example? It would put all of the weight
+on one arm, whichever one had a slightly higher correlation with
+the response.
+
+## The elastic net with glmnet
+
+The `glmnet` functions fits, and is named for, a collection
+of models that sit in-between ridge and lasso regression known
+as the *elastic net*. This is defined as:
+
+$$ \widehat{\beta}_{ridge} \in \arg\min \left\{\frac{1}{2n} \cdot || y - X \beta||_2^2 + \alpha \cdot \lambda \cdot || \beta ||_1 + (1 - \alpha) \cdot \lambda \cdot || \beta ||_2^2, \quad b \in \mathbb{R}^p \right\}, \quad \lambda > 0 $$
+
+You can see how we can get ridge by setting alpha to 0 and the
+lasso regression by setting alpha to 1 (the latter is the default).
+Settings with alpha somewhere in between 0 and 1 blend the behavior
+of the two estimators. Generally, the elastic net tends to still set
+some coefficients to zero but tries to spread the weight out evenly
+over higher correlated groups of variables. Here's an example on our
+data set:
+
+```{r}
+model <- cv.glmnet(X, y, alpha = 0.2)
+
+tibble(month = rownames(coef(model))[-1], val = coef(model)[-1]) %>%
+  ggplot(aes(factor(month, levels = tolower(month.abb)), val)) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_path(aes(group = 1), size = 1) +
+    geom_point(size = 3) +
+    theme_minimal() +
+    scale_x_discrete(breaks = tolower(month.abb)) +
+    xlab("Month") + ylab("Coefficent")
+```
+
+With a value of 0.2, the model puts some weight on March, April, June, and July,
+a true blend between the ridge and lass models
+
+### Model selection
+
+Let's look at the California house price data set again.
+
+```{r, message = FALSE}
+set.seed(1)
+ca <- read_csv("data/ca_house_price.csv") %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+
+mf <- model.frame(median_house_value ~ . -1,
+                  data = select(ca, -train_id))
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
+
+X_train <- X[ca$train_id == "train",]
+y_train <- y[ca$train_id == "train"]
+```
+
+We will run an elastic net regression on the data:
+
+```{r}
+model <- cv.glmnet(X_train, y_train, alpha = 0.9)
+```
+
+The function intelligently picks a set of 100 values of lambda
+to fit the elastic net to. We can see all of these by looking
+at the lambda parameter of the model
+
+```{r}
+model$lambda
+```
+
+The `coef` and `predict` function, by default, choose the
+optimal value of lambda; we will see in the final section today
+exactly how this is done. We can manually pass either function
+the option `s` to specify which value of lambda we want the
+parameters for (that it is called `s` and not `lambda` has always
+been a pet-peeve of mine). We can pick any value between the
+largest and smallest lambda parameters, though it generally
+makes sense to pick values where the model was actually fit.
+
+The primary reason for looking at other values of lambda is to
+see which variables are included when the penalty is very
+high. Here, at the 10th value of lambda (remember, they are
+in descending order), we see that only `mean_household_income`
+is included:
+
+```{r}
+coef(model, s = model$lambda[10])
+```
+
+Setting it to the 14th value, shows several additional variables
+that seem particularly important:
+
+```{r}
+coef(model, s = model$lambda[14])
+```
+
+Notice, however, that latitude and longitude are not popping
+up because we would need several interaction orders for them
+to become the most predictive variables. We'll see next class
+some ways of mitigating these weakness of `glmnet`.
+
+### Scaling and intercepts
+
+As we wrote the lasso, ridge regression, and elastic net the
+scale of the predictor variables would have a large impact on
+the model. We did not focus on this because **glmnet** always
+scales the columns to have unit variance and zero mean. Generally,
+we do not have to worry about this and I have rarely found a
+reason to modify this default behavior.
+
+The elastic net function
+also puts in a manual intercept for us. The intercept is
+treated differently because it does not have a penalty. Again,
+this is almost always the preferred behavior and you will likely
+have no reason to change it. If you accidentally do put in an
+intercept into the model, it will be silently ignored (why would
+the model put a weight on your intercept, which is penalized,
+rather than the internal one which is not?).
+
+### Binomial and Multinomial elastic net
+
+The "g" in `glmnet` stands for the same generalized as in
+`glm` and `gam`. We can fit binomial and multinomial models
+by adjusting the family function. Here is an example with the
+NBA dataset:
+
+```{r, message = FALSE}
+set.seed(1)
+nba <- read_csv("data/nba_shots.csv") %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+
+mf <- model.frame(fgm ~ . -1, data = select(nba, -player_name, -train_id))
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
+
+X_train <- X[nba$train_id == "train",]
+y_train <- y[nba$train_id == "train"]
+```
+
+Unlike with `glm` and `gam`, we have to provide the family name in
+quotes and there is no link function to specify (logit is default
+and only choice):
+
+```{r}
+model <- cv.glmnet(X_train, y_train, alpha = 0.9, family = "binomial")
+```
+
+The internal representation of the model is almost exactly the same.
+Here, we see the most important variables in the model (notice that
+we can give multiple values of lambda):
+
+```{r}
+coef(model, s = model$lambda[c(6, 10, 20)])
+```
+
+So, shot distance seems to be the most important, followed
+by shot clock, and then touch time and closest defender
+height.
+
+### Cross-validation
+
+How does the elastic net determine which value of lambda
+is the best? It uses a process called cross-validation
+(that's where the "cv" comes from) where the training set
+itself is used to do automated validation of the model.
+
+Cross validation works as follows. Here I am using 10-fold
+validation, but you can modify to have k-fold validation:
+
+- start with an initial choice of lambda
+- assign every training observation randomly to one of
+ten buckets
+- fit a model using only data from buckets 2-10 with
+the first lambda value. Use this to predict the values
+from bucket 1.
+- fit a model using only data from buckets 1, and 3-10.
+Use this to predict the values from bucket 2.
+- repeat eight more time to get predictions for the other
+buckets
+- you now have a prediction for each point in the training
+data. Compute the RMSE or other target metric on this set.
+- repeat for all values of lambda (100, by default)
+
+The "best" lambda is the one that is found to minimize the
+target metric from cross-validation. A final model is built
+using all of the data and that is the one that we get as
+an output.
+
+Let's visualize this by including the player name variable in our model matrix
+in order to create a model matrix with a large number of variables.
+
+```{r, message = FALSE}
+mf <- model.frame(fgm ~ . -1, data = select(nba, -train_id))
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
+
+X_train <- X[nba$train_id == "train",]
+y_train <- y[nba$train_id == "train"]
+
+dim(X)
+```
+
+And fit the cross-validated elastic net model:
+
+```{r}
+model <- cv.glmnet(X_train, y_train, alpha = 0.9, family = "binomial")
+```
+
+Plotting the model visualizes the cross-validation
+error for each value of lambda:
+
+```{r}
+plot(model)
+```
+
+We can see the "best" lambda, as well as the other lambda defined by the dashed
+line above:
+
+```{r}
+c(lambda.min = log(model$lambda.min), lambda.1se = log(model$lambda.1se))
+```
+
+The second lambda gives a model that is within one standard
+error of the predictions from the "best" model but often has
+significantly fewer variables in it. We can see that here:
+
+```{r}
+mat <- coef(model, s = c(model$lambda.min, model$lambda.1se))
+mat[mat[,1] != 0, ]
+```
+
+Often, the best model on new data sets will be the model set with the
+lambda with a cross-validation lose 1 standard error greater than the minimum
+value. It is also much easier to interpret the results.

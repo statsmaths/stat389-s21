@@ -1,0 +1,32 @@
+---
+title: "Setup"
+author: "Taylor Arnold"
+---
+
+## Setup
+
+This notebook installs all of the packaged needed for the other notebooks. If
+you are running this using the workspaces on RStudio Cloud, you should not need
+to re-run this. On your own machine, this is needed before proceeding through
+the other notebooks. See Notebook01 for information about how to run R code and
+how code is structure into packages.
+
+```{r}
+install.packages(
+  pkgs = c(
+    "tidyverse", "ggrepel", "cleanNLP", "ggimg", "jsonlite",
+    "lubridate", "readxl", "rnaturalearth", "sf", "stringi", "xml2",
+    "readr", "ggplot2", "stringi", "forcats", "ggrepel", "tidyr",
+    "tidyverse", "Hmisc", "irlba", "devtools", "umap", "glmnet",
+    "remotes", "tidyverse", "knitr", "rmarkdown", "igraph", "lwgeom",
+    "RcppRoll", "glmnet", "tokenizers", "udpipe", "cld3", "topicmodels"
+  )
+)
+```
+
+Once you install the packages above, also install the following directly from
+GitHub.
+
+```{r}
+remotes::install_github("statsmaths/smodels", upgrade = "always")
+```

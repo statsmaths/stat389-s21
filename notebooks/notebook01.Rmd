@@ -1,0 +1,364 @@
+---
+title: "Notebook 01: Language of Predictive Models"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+```{r message=FALSE}
+library(tidyverse)
+library(forcats)
+library(ggrepel)
+library(smodels)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+options(width = 77L)
+```
+
+## Tea Reviews
+
+We are going to start by looking at a data set of tea reviews. Specifically, tea
+reviews from the [Adagio Tea](http://www.adagio.com/) website. I collected this
+data set a few years ago, so it should be similar but not exactly the same as
+what is one the site today. Let's read the data into R:
+
+```{r, message = FALSE}
+tea <- read_csv(file.path("data", "tea.csv"))
+tea
+```
+
+Looking at the data in the data viewer, we see several variables. The goal is
+to predict the user score of each tea.
+
+Variables available to predict the output are the type of tea, the number of
+reviews received the price of the tea. The latter is given in estimated cents
+per cup as reported on the site. We also have the full name of the tea, though
+that will not be very useful for prediction.
+
+## Exploratory analysis
+
+### Univariate plots
+
+Before doing anything else, we will do some exploratory data analysis:
+
+```{r, warning=FALSE}
+tea %>%
+  ggplot(aes(x = score)) +
+    geom_bar()
+```
+
+The score values are generally very high, with most of them above 88. All of
+the scores are whole integers, and the most common values are between 92 and 95.
+
+```{r, warning=FALSE}
+tea %>%
+  ggplot(aes(x = price)) +
+    geom_histogram(bins = 15, color = "black", fill = "white")
+```
+
+The price variable is heavily skewed, with a few very expensive teas. Most are
+well under a quarter per cup.
+
+```{r, warning=FALSE}
+tea %>%
+  ggplot(aes(x = num_reviews)) +
+    geom_histogram(bins = 15, color = "black", fill = "white")
+```
+
+The number of reviews also have a bit of skew, but not as strongly as the price
+variable.
+
+```{r, warning=FALSE}
+tea %>%
+  group_by(type) %>%
+  summarise(sm_count()) %>%
+  arrange(desc(count)) %>%
+  mutate(type = fct_inorder(type)) %>%
+  ggplot(aes(x = type, count)) +
+    geom_col()
+```
+
+There are twelve types of tea, with some having only a few samples and others
+having over thirty.
+
+### Bivariate plots
+
+Now, we can proceed to bi-variate plots showing the relationship between each
+variable and the response.
+
+```{r, warning=FALSE}
+tea %>%
+  ggplot(aes(num_reviews, score)) +
+    geom_point()
+```
+
+There seems to be a slight positive relationship between the number of reviews
+and the score.
+
+```{r, warning=FALSE}
+tea %>%
+  ggplot(aes(price, score)) +
+    geom_point()
+```
+
+Given the skew of the plot, it is hard to figure out the exact relationship
+between price and score.
+
+## Linear Models
+
+The classical linear regression model assumes that the average value, or mean,
+of the response Y is a linear function of X. Symbolically, with the index i
+representing the i'th sample, this gives:
+
+$$ \text{mean} (Y_i) = \alpha + \beta * X_i $$
+
+Similarly, we can write that Y is equal to a fixed linear effect dependent on X
+plus a random variable epsilon with zero mean.
+
+$$ Y_i = \alpha + \beta * X_i + \epsilon_i, \quad mean(\epsilon_i) = 0 $$
+
+The estimation task here is to find reasonable estimates for
+the alpha and beta components given pairs of observations (X, Y).
+There are many ways of doing this but by far the most common is
+to use what is known as **Ordinary Least Squares** or OLS.
+This selects the alpha and beta that minimize the squared errors
+implied by the linear model. As before, let's write this down
+symbolically:
+
+$$ \alpha, \beta \in \arg\min \left\{ \left. \sum_i \left(y_i - a - b x_i \right)^2 \quad \right| \quad a, b \in \mathbb{R} \right\} $$
+
+A natural question is to ask why we are interested in the squared
+errors. We could just as likely ask for the minimizer of the
+absolute value of the errors or the minimizer of the maximum
+errors.
+
+I can offer two justifications of the squared error, one numerical
+and one statistical. Using the squared error, unlike the absolute
+errors or maximum errors, produces a smooth function. That is, a
+function that has an infinite number of derivatives at every point
+(although, all derivatives after 2 are equal to zero). This makes it
+easier to find a solution to the linear equation. Secondly, if the
+errors are distributed as a normal random variable the OLS estimator
+is equivalent to the maximum likelihood estimator (MLE).
+
+## Linear Models - Visually
+
+In order to better understand linear models, it helps to see a
+picture. Below I have drawn a line through our data set and
+indicated the errors (also known as residuals) that the ordinary
+least squares is concerned with minimizing. Note: don't worry
+much about the code producing this graphic, concentrate just on
+the output for now.
+
+```{r, warning = FALSE}
+tea %>%
+  mutate(score_pred = 87 + num_reviews * 0.003) %>%
+  ggplot(aes(num_reviews, score)) +
+    geom_point() +
+    geom_line(aes(num_reviews, score_pred), color = "orange") +
+    geom_segment(aes(xend = num_reviews, yend = score_pred), alpha = 0.5)
+```
+
+Notice that this line under-guesses most of the score of teas, particularly
+if the number of reviews is low.
+
+## Brute Force
+
+How can we figure out what the best alpha and beta are for this
+model? The most straightforward way would be to just try a large
+number of values and see which one minimizes the response. This
+is largely impractical but useful to see in this small example.
+It will also let you see some more involved R code.
+
+To start, we construct variables to hold the best sum of squares,
+alpha, and beta values. We then create a double loop cycling
+over all combinations of alpha and beta and testing whether the
+given configuration gives a better sum of squares compared to
+our current best value.
+
+```{r}
+params <- expand_grid(
+  a = seq(75, 120, by = 0.1), b = seq(0.0001, 0.01, by = 0.00001), sum_sqrs = NA_real_
+)
+params
+```
+
+```{r}
+params %>%
+  rowwise() %>%
+  mutate(sum_sqrs = sum((tea$score - (a + tea$num_reviews * b))^2)) %>%
+  ungroup() %>%
+  arrange(sum_sqrs)
+```
+
+## Using lm
+
+Now, we will compare the brute force algorithm with the lm function, which uses
+an analytic formula to compute the best fit:
+
+```{r, warning = FALSE}
+model <- tea %>%
+  lm(score ~ num_reviews, data = .)
+
+summary(model)
+```
+
+Our brute-force solution is actually quote close to this! Of course, it
+depended on me knowing approximately what the right slope and intercept
+should be. In this case that was easy graphically, but in more complex example
+it is a much more challenging task.
+
+We can use the predict function to fit predictions for model to our data:
+
+```{r}
+tea %>%
+  mutate(score_pred_lm = predict(model, newdata = .)) %>%
+  select(score, name, score_pred_lm)
+```
+
+And now plot the fitted values. Does it visually correspond to where you would
+expect the best fit line to run?
+
+```{r, warning=FALSE}
+tea %>%
+  mutate(score_pred_lm = predict(model, newdata = .)) %>%
+  ggplot(aes(num_reviews, score)) +
+    geom_point() +
+    geom_line(aes(num_reviews, score_pred_lm), color = "orange") +
+    geom_segment(aes(xend = num_reviews, yend = score_pred_lm), alpha = 0.5)
+```
+
+## Evaluating models
+
+How should be evaluate the predictive ability of a model? The method of ordinary
+least squares suggests that we should consider the sum of squared errors. A
+challenge with this is that the value of a sum will grow in proportion to how
+many observations there are. This makes it hard to compare results across data
+sources and subsets. A simple solution is to use the average value of the
+squared errors, known as the mean squared error or MSE:
+
+```{r}
+tea %>%
+  mutate(score_pred_lm = predict(model, newdata = .)) %>%
+  summarize(mse = mean((score - score_pred_lm)^2))
+```
+
+This works as a general measurement of error, but the units are a bit strange
+as they are given in squared scores. A simple solution to this exists by taking
+the square root of the MSE, resulting in the root mean squared error (RMSE):
+
+```{r}
+tea %>%
+  mutate(score_pred_lm = predict(model, newdata = .)) %>%
+  summarize(rmse = sqrt(mean((score - score_pred_lm)^2)))
+```
+
+You'll find references to the RMSE through the literature on machine learning
+as it is by far the most common measurement for predictiveness of continuous
+responses.
+
+How good of a result is our RMSE of 1.99? It's hard to say for sure, but one
+easy thing to do is to compare it to the simplest possible model: the one that
+predicts every score will be equal to the average score. The RMSE of this
+estimator is given by:
+
+```{r}
+tea %>%
+  mutate(score_pred_const = mean(score)) %>%
+  summarize(rmse = sqrt(mean((score - score_pred_const)^2)))
+```
+
+So, we have improved on the baseline model, but not by a large amount. Note that
+if you are familiar with the standard error, the RMSE of the mean is *almost*
+equal to the standard error of the response.
+
+## Multivariate linear regression
+
+The linear regression model I just introduced is known as simple linear
+regression because there is only one explanatory variable. We can easy consider
+multivariate models; for instance, we can be write a two variable model
+mathematically as follows:
+
+$$ Y_i = \alpha + \beta * X_i + \gamma * Z_i + \epsilon_i, \quad mean(\epsilon_i) = 0 $$
+
+The geometric interpretation of this is that we have plane in place of the line
+in the simple linear regression model.
+
+When I teach an applied statistics course, we spend a lot of time working up to
+multivariate regression models. The interpretation of multivariate models can
+quickly become quite complex. However, using multivariate models in statistical
+learning is much easier to understand: each slope coefficient (beta and gamma
+here) corresponds to a weight placed on how much the response changes with each
+predictor variable.
+
+Fitting multivariate models is also quite easy with the `lm` function. Simply
+add the variables together that you would like to use for prediction. Here we
+use both the number of reviews and the price of the tea:
+
+```{r}
+model <- tea %>%
+  lm(score ~ num_reviews + price, data = .)
+
+summary(model)
+```
+
+The predictiveness of the model has been greatly improved over the simple
+linear regression from before:
+
+```{r}
+tea %>%
+  mutate(score_pred_lm = mean(score)) %>%
+  summarize(rmse = sqrt(mean((score - score_pred_lm)^2)))
+```
+
+## Training and Validation Data
+
+So far we have been using our tea data set to build a predictive model and then
+to evaluate it. We are cheating a bit here, because it's fairly easy to make
+predictions about something we have already seen. In predictive modeling, a
+standard way of avoiding this is to randomly split our data set into two
+different groups: a training set and a validation set (other terms are sometimes
+used, but these are what I will call them). We can then fit our model parameters
+using the training data and then validate how well our model fits on the
+validation set.
+
+Here is some code to add an indicator variable to the data splitting the data
+into a training and validation observations. The seed makes sure that the split
+is consistent; I have chosen to split the data into 60% training and 40%
+validation.
+
+```{r, message=FALSE}
+set.seed(1)
+
+tea <- read_csv(file.path("data", "tea.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+tea
+```
+
+And now we will fit the linear regression model using just those observations
+that are in the training data set:
+
+```{r}
+model <- tea %>%
+  filter(train_id == "train") %>%
+  lm(score ~ num_reviews + price, data = .)
+
+summary(model)
+```
+
+Notice that the coefficients are slightly different now. Then, we will predict
+the model on the entire data set and find the RMSE on both the training and
+validation data:
+
+```{r}
+tea %>%
+  mutate(score_pred_lm = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((score - score_pred_lm)^2)))
+```
+
+As we might expect, the model fits the training data much better than the
+validation data.

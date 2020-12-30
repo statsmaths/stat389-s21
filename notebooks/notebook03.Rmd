@@ -1,0 +1,330 @@
+---
+title: "Notebook 03: Classification and Logistic Regression"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+```{r message=FALSE}
+library(tidyverse)
+library(forcats)
+library(ggrepel)
+library(smodels)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+options(width = 77L)
+```
+
+
+## NBA Dataset
+
+Today we are going to look at a dataset based on attempted
+shots in the NBA. Specifically, using features based on when
+and where the shot was taken, we want to predict whether or
+not the shot was successful.
+
+```{r, message = FALSE}
+set.seed(1)
+
+nba <- read_csv("data/nba_shots.csv") %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+nba
+```
+
+Notice that the response of interest is coded as either `0` (shot missed)
+or `1` (shot made).
+
+### Linear Regression
+
+We can apply a simple linear regression to this prediction task.
+To start, I will use only the variables `shot_clock` and `shot_dist`.
+
+```{r}
+model <- nba %>%
+  filter(train_id == "train") %>%
+  lm(fgm ~ shot_clock + shot_dist, data = .)
+
+summary(model)
+```
+
+Plotting the predicted values we see a reasonable pattern:
+
+```{r}
+nba %>%
+  mutate(fgm_pred = predict(model, newdata = .)) %>%
+  ggplot(aes(shot_clock, shot_dist)) +
+    geom_point(aes(color = fgm_pred)) +
+    scale_color_viridis_c()
+```
+
+Shots taken from farther away have a higher value as do shots taken
+with more time on the clock.
+
+Think for a moment about exactly what the predicted value might mean
+here. If it is 1, the model predicts that the shot will be made and
+if 0 the model predicts it will not be made. What about 0.5? Here, it
+seems like there is an equal chance of the shot missing or being
+made. Extrapolating, we can see the predicted value as a predicted
+probability.
+
+We can change the plot to show exactly where we believe a shot is more
+likely to miss versus where it is more likely to be made:
+
+```{r}
+nba %>%
+  mutate(fgm_pred = predict(model, newdata = .)) %>%
+  mutate(fgm_pred_bin = (fgm_pred > 0.5)) %>%
+  ggplot(aes(shot_clock, shot_dist)) +
+    geom_point(aes(color = fgm_pred_bin)) +
+    scale_color_viridis_d()
+```
+
+Notice that, because this is a linear model, the separation between the
+two regions is given by a straight line.
+
+We can draw a similar diagram with other features. Here we have `shot_clock`
+and the distance of the closest defender:
+
+```{r}
+model <- nba %>%
+  filter(train_id == "train") %>%
+  lm(fgm ~ shot_clock + close_def_dist, data = .)
+
+nba %>%
+  mutate(fgm_pred = predict(model, newdata = .)) %>%
+  mutate(fgm_pred_bin = (fgm_pred > 0.5)) %>%
+  ggplot(aes(shot_clock, close_def_dist)) +
+    geom_point(aes(color = fgm_pred_bin)) +
+    scale_color_viridis_d()
+```
+
+Again, the general trend seems as expected. Finally, we will repeat with
+the `shot_clock` and the height of the nearest defender.
+
+```{r}
+model <- nba %>%
+  filter(train_id == "train") %>%
+  lm(fgm ~ shot_clock + defender_height, data = .)
+
+nba %>%
+  mutate(fgm_pred = predict(model, newdata = .)) %>%
+  mutate(fgm_pred_bin = (fgm_pred > 0.5)) %>%
+  ggplot(aes(shot_clock, defender_height)) +
+    geom_point(aes(color = fgm_pred_bin)) +
+    scale_color_viridis_d()
+```
+
+And again, the pattern matches the relationship we would expect and
+shows how the two regions are separated by a straight line.
+
+### Classification rate
+
+The variable we are trying to predict here is quite different from all
+of our previous examples. It takes on only one of two values. In cases
+like this (such as a spam classifier or cancer detection algorithm),
+as we have just seen, it is possible to ignore this distinction when
+fitting a model by treating one category as a `0` and the other category
+as a `1`. Next time, we'll see what to do when we have more than two
+categories.
+
+When our response takes on only a small set of values, particularly if
+these are un-ordered, we say that we are doing **classification**.
+Somewhat confusingly, the complement of classification is often called
+**regression**. I try to avoid this later term because it can become
+confusing with the more general notion of regression models.
+
+It is possible to use RMSE to measure how well our predicted probabilities
+fit the data. Often though, we ultimately do not care much about the
+probabilities, and simple want to make the binary guess of our model
+be correct as often as possible. Here, we would only allow for predictions
+to be either `0` or `1`. The best metric for measuring this is the
+*classification rate*, the proportion of guesses that were correct. We
+can measure that here fairly quickly:
+
+```{r}
+nba %>%
+  mutate(fgm_pred = as.numeric(predict(model, newdata = .) > 0.5)) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(fgm == fgm_pred))
+```
+
+Here, we have a classification rate of 52.4% on the validation set. Another
+way to evaluate classification problems is by looking at a table of the
+predicted outcomes by the actual outcomes. This is called a confusion matrix.
+
+```{r}
+nba %>%
+  mutate(fgm_pred = as.numeric(predict(model, newdata = .) > 0.5)) %>%
+  select(fgm, fgm_pred, train_id) %>%
+  table()
+```
+
+This type of table is useful to see what kinds of errors are we making. It
+becomes particularly useful when working with more than two categories.
+
+## Generalized Linear Models
+
+While we can apply linear regression to classification problems, the
+model assumptions of linear regression do not hold for classification.
+For one thing, if we have:
+
+$$ \text{mean} (Y) = X \beta $$
+
+This implies that it is possible, with extreme values of X, for some
+inputs to have a mean that is less than 0 or greater than 1. As the
+mean of a binary variable corresponds to the probability that it is
+equal to 1, this does not make sense.
+
+Generalized linear models (GLMs) extend the linear model assumptions to
+allow for a more complex relationship between Y and X. The linear
+part that is preserved, is that X is always multiplied (as a matrix)
+by the unknown parameters beta. The most commonly seen GLM relates
+the *log odds ratio* to the linear predictor:
+
+$$ \log \left( \frac{\mathbb{P}[Y_i = 1]}{1 - \mathbb{P}[Y_i = 1]} \right) = X \beta $$
+
+The left-hand side here can be written equivalently using the
+logit function, which is simply defined to be equivalent to
+the log odds ratio:
+
+$$ \text{logit}(\mathbb{P}[Y_i = 1]) = X \beta $$
+
+There are a number of justifications for using the log odds. The
+easiest to explain is that the odds ratio can be any non-negative
+value and therefore the logarithm of the odds ratio can be any
+real number. This makes it reasonable to assume that the log odds
+could be represented by X beta. There are more technical reasons
+for using this particular function, the logit, having to do with
+the theory of exponential families.
+
+A GLM using the logit function is so common that it
+has its own name: *logistic regression*.
+
+Once we have learned the regression vector in logistic regression,
+we can get predicted probabilities using the inverse logit function:
+
+$$ \mathbb{P}[Y_i = 1] = \text{logit}^{-1} (X \beta) $$
+
+### GLMs in R
+
+To git a generalized linear model in R, we replace the `lm` function
+for the `glm` function. With no other changes, the learned model parameters
+will be exactly the same as before. If we set the `family` parameter to
+`binomial` we will get logistic regression:
+
+```{r}
+model <- nba %>%
+  filter(train_id == "train") %>%
+  glm(fgm ~ shot_clock + shot_dist, data = ., family = binomial)
+
+summary(model)
+```
+
+When using the `predict` function, you need to be careful to select
+the option `type = "response"`. Otherwise, R will return the values
+X beta, without applying the inverse logit function.
+
+```{r}
+nba %>%
+  mutate(fgm_pred = predict(model, newdata = ., type = "response")) %>%
+  select(fgm, fgm_pred)
+```
+
+The predicted values seem very similar to those given by the linear
+regression from before:
+
+```{r}
+nba %>%
+  mutate(fgm_pred = predict(model, newdata = ., type = "response")) %>%
+  ggplot(aes(shot_clock, shot_dist)) +
+    geom_point(aes(color = fgm_pred)) +
+    scale_color_viridis_c()
+```
+
+And the two classes seem virtually the same as before as well:
+
+```{r}
+nba %>%
+  mutate(fgm_pred = predict(model, newdata = ., type = "response")) %>%
+  mutate(fgm_pred = (fgm_pred > 0.5)) %>%
+  ggplot(aes(shot_clock, shot_dist)) +
+    geom_point(aes(color = fgm_pred)) +
+    scale_color_viridis_d()
+```
+
+### GLM and LM comparison
+
+Visually, it looks like the output of the GLM and LM are not
+very different. Let's formalize that here by saving the
+predicted classes from both:
+
+```{r}
+model_lm <- nba %>%
+  filter(train_id == "train") %>%
+  lm(fgm ~ shot_clock + shot_dist, data = .)
+
+model_glm <- nba %>%
+  filter(train_id == "train") %>%
+  glm(fgm ~ shot_clock + shot_dist, data = ., family = binomial)
+```
+
+Here we see that only a handful of points right on the boundary
+differ between the models:
+
+```{r}
+nba %>%
+  mutate(fgm_pred_lm = as.numeric(predict(model_lm, newdata = .) > 0.5)) %>%
+  mutate(fgm_pred_glm = as.numeric(
+    predict(model_glm, newdata = ., type = "response") > 0.5)
+  ) %>%
+  arrange(nba, fgm_pred_lm != fgm_pred_glm) %>%
+  mutate(class = if_else(fgm_pred_lm == 1 & fgm_pred_glm == 1, "Both 1", "other")) %>%
+  mutate(class = if_else(fgm_pred_lm == 0 & fgm_pred_glm == 0, "Both 0", class)) %>%
+  mutate(class = if_else(fgm_pred_lm == 1 & fgm_pred_glm == 0, "lm > glm", class)) %>%
+  mutate(class = if_else(fgm_pred_lm == 0 & fgm_pred_glm == 1, "lm < glm", class)) %>%
+  mutate(alpha = if_else(fgm_pred_lm == fgm_pred_glm, 0.02, 1)) %>%
+  ggplot(aes(shot_clock, shot_dist)) +
+    geom_point(aes(color = class, alpha = alpha)) +
+    scale_color_viridis_d() +
+    scale_alpha_identity() +
+    labs(color = "Predictions")
+```
+
+Similarly, even the predicted probabilities seem very similar. Saving
+these from both models:
+
+```{r}
+model <- lm(fgm ~ shot_clock + shot_dist,
+            data = filter(nba, train_id == "train"))
+nba$fgm_pred_lm <- predict(model, newdata = nba, type = "response")
+
+model <- glm(fgm ~ shot_clock + shot_dist,
+            data = filter(nba, train_id == "train"),
+            family = binomial)
+nba$fgm_pred_glm <- predict(model, newdata = nba, type = "response")
+```
+
+And plotting them:
+
+```{r}
+nba %>%
+  mutate(fgm_pred_lm = predict(model_lm, newdata = .)) %>%
+  mutate(fgm_pred_glm = predict(model_glm, newdata = ., type = "response")) %>%
+  ggplot(aes(fgm_pred_lm, fgm_pred_glm)) +
+    geom_point() +
+    geom_abline(aes(intercept = 0, slope = 1), color = "orange", size = 1.5)
+```
+
+We see that the greatest difference comes from very low probability
+shots. This is a general categorization of the difference between
+logistic and linear regression for classification tasks. Typically
+the only differences arise when we have extreme probabilities. If
+most of the predicted values fall within the same range, the linear
+model provides a good approximation. In most cases, I do not see a
+large difference between the two models from a predictive standpoint.
+In some cases, particularly when dealing with relatively rare events,
+logistic regression offers better predictions. However, this comes
+at a cost of a slower run time.

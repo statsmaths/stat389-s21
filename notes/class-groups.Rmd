@@ -1,0 +1,57 @@
+---
+title: "Class Groups"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+
+theme_set(theme_minimal())
+options(pillar.min_character_chars = 15)
+Sys.setlocale("LC_TIME", "en_US.UTF-8")
+```
+
+Project groups will be formed during the first week of the semester.
+
+### Section 01 (11h00 > 12h15)
+
+**Group 1**:
+
+**Group 2**:
+
+**Group 3**:
+
+**Group 4**:
+
+**Group 5**:
+
+**Group 6**:
+
+**Group 7**:
+
+**Group 8**:
+
+
+### Section 02 (14h30 > 15h45)
+
+**Group 1**:
+
+**Group 2**:
+
+**Group 3**:
+
+**Group 4**:
+
+**Group 5**:
+
+**Group 6**:
+
+**Group 7**:
+
+**Group 8**:
