@@ -1,7 +1,7 @@
 ---
 title: "Introduction to R and RStudio Cloud Setup"
 author: "Taylor Arnold"
-date: "2020-08-27"
+date: "2021-01-02"
 output:
   xaringan::moon_reader:
     lib_dir: libs

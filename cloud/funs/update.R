@@ -20,11 +20,12 @@
     }
   }
 
+  this_time <- as.character(Sys.time())
   if (length(downloaded))
   {
-    message(sprintf("Downloaded file %s\n", downloaded))
+    message(sprintf("%s - Downloaded file '%s'.\n", this_time, downloaded))
   } else {
-    message("Nothing new to download.")
+    message(sprintf("%s - Nothing new to download", this_time))
   }
 }
 
