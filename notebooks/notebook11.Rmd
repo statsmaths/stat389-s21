@@ -20,34 +20,79 @@ options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
 
+## Clustering Food Data
+
+For these notes, we will read in the same food Wikipedia pages that we started
+looking at last time.
+
 ```{r, message=FALSE}
 food <- read_csv("data/food_page.csv")
 token <- read_csv("data/food_page_token.csv.gz")
 ```
 
+We will add just one more addition to the data that we saw last time: grouping
+the documents into clusters. Clustering a corpus of texts can help understand
+the structure and themes described in the corpus. With clustering, we are 
+using an *unsupervised* machine learning technique, compared to the *supervised*
+approaches that dominated the earlier notes.
+
+To do clustering with our text data today, we will cluster the first several
+principle components of the TF-IDF matrix. The clustering algorithm that we
+will use is called k-means. It is an iterative algorithm that works as follows:
+
+1. Pick the number of clusters N that you want to detect.
+2. Randomly choose N data points as the starting centers of each cluster.
+3. Compute the distance of every data point to the centers of the current
+clusters.
+4. Assign each data point to the cluster whose center it is closest.
+5. Re-compute the cluster centers as the average value of all the points in a
+cluster.
+6. Take the new cluster centers, and repeat the process (computer distances,
+reassign to groups, and recompute the centers) iteratively until convergence.
+
+The algorithm is not entirely deterministic because of the random starting
+points. Typically, the algorithm is run several times and the "best" clustering
+is chosen. How do we define the "best" in the case of a clustering algorithm?
+A typical method is to measure the sum of squared distances to the cluster
+centers, a quantity that a good clustering will minimize.
+
+To compute k-means clustering, we can use the `sm_kmeans` function. Notice that
+the algorithm requires setting the number of clusters; often this takes a bit 
+of guesswork and trial and error.
+
 ```{r}
 token %>%
   cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
   sm_tidy_pca(n = 2) %>%
-  sm_kmeans()
+  sm_kmeans(clusters = 3)
 ```
 
+Notice that the output gives the principle components as well as the cluster id.
+Note that order of the clusters is not important; it is only important which
+set of documents are in the same cluster.
+
+We can visualize the way the algorithm works by plotting the two principle 
+components along with the cluster id:
 
 ```{r, warning=FALSE}
 token %>%
   cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
   sm_tidy_pca(n = 2) %>%
-  sm_kmeans() %>%
+  sm_kmeans(clusters = 3) %>%
   ggplot(aes(v1, v2)) +
     geom_point(aes(color = factor(cluster))) +
     scale_color_viridis_d()
 ```
 
+Putting the page labels on the plot shows the clustering does group similar
+pages together (all of the meats and seafoods are grouped together in a single
+cluster).
+
 ```{r, warning=FALSE}
 token %>%
   cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
   sm_tidy_pca(n = 2) %>%
-  sm_kmeans() %>%
+  sm_kmeans(clusters = 3) %>%
   ggplot(aes(v1, v2)) +
     geom_point(aes(color = factor(cluster))) +
     geom_text_repel(
@@ -57,6 +102,9 @@ token %>%
     labs(color = "Cluster") +
     theme_void()
 ```
+
+It can, particularly when looking at more PCA dimensions or large datasets,
+also be useful to just look at the documents in each cluster as a table.
 
 ```{r}
 token %>%
@@ -68,8 +116,7 @@ token %>%
   use_series(document_paste)
 ```
 
-
-
+And then we can look at what happens when the number of clusters increases:
 
 ```{r}
 token %>%
@@ -81,6 +128,7 @@ token %>%
   use_series(document_paste)
 ```
 
+Or the number of PCA dimensions:
 
 ```{r}
 token %>%
@@ -92,7 +140,13 @@ token %>%
   use_series(document_paste)
 ```
 
-```{r, warning=FALSE}
+The latter set of clusters does a great job of grouping together similar food
+items. Often you will find that including a few dozen PCA components provides
+a better fit (though it is rarely useful to use the entire TF-IDF). We can
+plot this clustering as well, but note that the clusters are harder to see
+because they are formed in 10-dimensions but plotted in 2.
+
+```{r, warning=FALSE, message=FALSE}
 token %>%
   cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
   sm_tidy_pca(n = 3) %>%
@@ -106,6 +160,8 @@ token %>%
     theme_void()
 ```
 
+Finally, we can also run clustering on other dimension reduction algorithms.
+For example, we can cluster the items aftering applying the UMAP algorithm.
 
 ```{r}
 token %>%
@@ -120,3 +176,11 @@ token %>%
     labs(color = "Cluster") +
     theme_void()
 ```
+
+I find that the specific clusters from UMAP are not quite as good for TF-IDF
+matrices for finding exact, clean breaks between groups. However, they are
+great at creating small groups that can be manually combined or used in 
+down-stream tasks. UMAP is also very powerful when working with image data,
+something out of scope for this semester but useful to know all the same.
+
+

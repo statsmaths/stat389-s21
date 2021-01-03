@@ -20,9 +20,26 @@ options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
 
+## Wikipedia NER
 
-```{r}
+For our final set of notes, we will once again look at the Wikipedia data set
+created by following the links from the Coffee and Tea pages.
+
+```{r, message = FALSE}
 wiki <- read_csv(file.path("data", "wiki_coffee_tea.csv"))
+```
+
+We have been using the results from parsing text throughout the semester. We
+have used the tokens table produced by the `cnlp_annotate` function, but when
+using the spaCy backend, there is another table of annotations that can
+sometimes by very useful called `entity`. For reference, this is how to extract
+it from the output:
+
+```{r, eval=FALSE}
+cnlp_init_spacy("en_core_web_sm")
+anno <- cnlp_annotate(wiki)
+token <- anno$token
+ner <- anno$entity
 ```
 
 ```{r, echo=FALSE, message=FALSE}
@@ -30,17 +47,17 @@ token <- read_csv(file.path("data", "wiki_coffee_tea_token.csv.gz"))
 ner <- read_csv(file.path("data", "wiki_coffee_tea_entity.csv.gz"))
 ```
 
-
-```{r, eval=FALSE}
-anno <- cnlp_annotate(wiki)
-token <- anno$token
-ner <- anno$entity
-```
-
+The process of finding *entities* is called Named Entity Recognition (NER). It
+is a very active area of natural language processing. This is what the data
+detected by the named entity recognition process looks like:
 
 ```{r}
 ner
 ```
+
+The algorithm has identified one or more tokens corresponding to known entities,
+such as dates, people, or locations. Here are some of the different entity types
+included in the data:
 
 ```{r}
 ner %>%
@@ -49,6 +66,15 @@ ner %>%
   arrange(desc(count))
 ```
 
+More details about the entity types can be found in the
+[spaCy documentation](https://spacy.io/api/annotation#named-entities).
+
+Entity detection has a large number of useful applications; for us we will 
+mostly use it to describe documents. This might be very useful for the final
+project, which works with one of two different news corpora. For example, we
+can detect the GPE (countries, cities, states) tags that occur most frequently
+(and at least 20 times) in each document:
+
 ```{r}
 ner %>%
   filter(entity_type == "GPE") %>%
@@ -56,12 +82,12 @@ ner %>%
   summarize(sm_count()) %>%
   arrange(doc_id, desc(count)) %>%
   slice_head(n = 1) %>%
-  filter(count > 20) %>%
+  filter(count >= 20) %>%
   mutate(lab = paste(doc_id, entity, sep = " => ")) %>%
   use_series(lab)
 ```
 
-
+Or, similarly, languages that are mentioned at least 4 times
 
 ```{r}
 ner %>%
@@ -70,11 +96,12 @@ ner %>%
   summarize(sm_count()) %>%
   arrange(doc_id, desc(count)) %>%
   slice_head(n = 1) %>%
-  filter(count > 4) %>%
+  filter(count >= 4) %>%
   mutate(lab = paste(doc_id, entity, sep = " => ")) %>%
   use_series(lab)
 ```
 
+Dates can be useful too, though some are more useful that others:
 
 ```{r}
 ner %>%
@@ -88,3 +115,8 @@ ner %>%
   use_series(lab)
 ```
 
+I do not have much more to say about these other than that they can be useful
+for specific tasks. For example, you can use them to find characters in a novel
+or for automatically linking pages to secondary sources. This later step
+requires an additional step of entity linking, which is not currently supported
+in the production version of **cleanNLP**, but should be soon.

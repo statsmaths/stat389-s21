@@ -68,8 +68,10 @@ wiki_get_pages <- function(query, lang)
   if (is.null(.volatiles$wiki_text)) { .load_wiki_data() }
 
   query <- unique(query)
-  df_search <- tibble(query = query, lang = lang)
-  df_need <- anti_join(df_search, .volatiles$wiki_look, by = c("query", "lang"))
+  df_search <- tibble::tibble(query = query, lang = lang)
+  df_need <- dplyr::anti_join(
+    df_search, .volatiles$wiki_look, by = c("query", "lang")
+  )
 
   if (n <- nrow(df_need))
   {

@@ -20,21 +20,68 @@ options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
 
+## Hierarchical document clustering
+
+Today's notes are quite short, but introduce a very important algorithm that
+is a useful partner to LDA Topic Modeling. To illustrate the method, let's
+read in the Wikipedia Coffee/Tea data again:
+
 ```{r, message=FALSE}
 wiki <- read_csv(file.path("data", "wiki_coffee_tea.csv"))
 token <- read_csv(file.path("data", "wiki_coffee_tea_token.csv.gz"))
 ```
 
+We will form a TF-IDF matrix consisting of all nouns, adjectives, adverbs,
+and verbs that occur in at least 1% of documents.
+
 ```{r}
 X <- token %>%
-  filter(upos %in% c("NOUN", "ADJ", "ADV")) %>%
-  cnlp_utils_tfidf(min_df = 0.001, max_df = 0.5, doc_set = wiki$doc_id)
+  filter(upos %in% c("NOUN", "ADJ", "ADV", "VERB")) %>%
+  cnlp_utils_tfidf(min_df = 0.01, max_df = 1, doc_set = wiki$doc_id)
 ```
+
+To this corpus we are going to apply a clustering algorithm called 
+spectral clustering. We will describe how the algorithm works in an abstract
+sense:
+
+1. First, compute a score for each document in a way such that documents that
+are close to one another (in cosine similarity) tend have similar scores and
+documents that are far away have different scores. This is a kind of
+dimension reduction and is computed by taking the second eigenvector of a 
+Laplacian matrix.
+2. Select a cutoff value for the score, breaking the corpus into documents
+less than this cut-off and documents greater than the cut-off. Typical options
+for the cut-off are zero (which tends to produce more interpretable splits)
+and the median (which will produce evenly sized splits).
+3. The data are now split into two groups. Apply the first two steps again to
+each subgroup to split the data into four, again to split into eight clusters,
+and so forth to the desired depth.
+
+One interesting and useful aspect of spectral clustering is that there is a
+relationship between the clusters. If, for example, we create 4 clusters, the
+first two will be the result of the first split, and therefore closer to 
+each other than the other two clusters.
+
+To run spectral clustering, we can use the `sm_spectral_cluster` function,
+setting the maximum depth of the splits and choosing to use zero as a cut-off
+(`balance = FALSE`) or the median (`balance = TRUE`).
 
 ```{r}
 clusters <- sm_spectral_cluster(X, max_depth = 5, balance = FALSE)
 clusters
 ```
+
+Notice that a binary encoding of the cluster group number is given to
+facilitate working with groups of clusters. The cluster numbers are given such
+that (in the case of a depth of 5, with 2^5 = 32 clusters) clusters 1-16 are the
+documents selected in one half of the first split and clusters 17-32 are those
+in the second half of the first split. Clusters 1-8 are in the first half of the
+split of the first group, clusters 9-16 are in the second half of the 
+first split of the first group, and so forth.
+
+We can look at random samples (in your notebook, it's easier to see them all)
+of each cluster to understand how this produces a hierarchical clustering of
+the documents in the corpus:
 
 ```{r}
 clusters %>%
@@ -44,3 +91,12 @@ clusters %>%
   mutate(doc_id = paste(cluster, doc_id, sep = " => ")) %>%
   use_series(doc_id)
 ```
+
+The extremes of the clustering are health-related pages on one end and
+geographical pages on the other.
+
+As a closing thought, when might you prefer spectral clustering to k-means
+clustering? I generally find spectral clustering to be more insightful for
+understanding the structure of a corpus of documents. However, k-means is
+easier and more appropriate for creating metafeatures for down-stream ML
+tasks.

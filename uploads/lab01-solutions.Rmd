@@ -1,0 +1,281 @@
+---
+title: "Lab 01"
+output: html_document
+---
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+library(Matrix)
+library(glmnet)
+library(cleanNLP)
+library(magrittr)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+```
+
+This is the first "lab" for the semester. I have included several empty code
+chunks and text prompts that start with "**Answer:**". You should fill in 
+solutions to these (code in the first case and a short answer in the second).
+These are not handed in or graded and solutions will be posted for next class.
+I suggest generally working as a group with a single shared screen, but you
+might want to also duplicate the code in your own machine.
+
+## California House Prices
+
+In this lab you will apply the methods shown in the notes to a data set of 
+housing prices from California. Our variable of interest is the median
+house sale price in each census tract.
+
+```{r, message=FALSE}
+set.seed(1)
+
+ca <- read_csv(file.path("data", "ca_house_price.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+ca
+```
+There are several numeric variables that you can use to predict the output,
+all of which should be reasonably self-explanatory.
+
+### Exploring the Data
+
+To start, draw a histogram with 15 bins showing the distribution of the
+median house value variable:
+
+```{r, question-01}
+ca %>%
+  ggplot(aes(median_house_value)) +
+    geom_histogram(bins = 15, color = "black", fill = "white")
+```
+
+What are the most typical values of the variable (they are given in
+thousands of dollars)? **Answer**: There are many values around \$300k dollars,
+with a long tail ranging from near \$0 to just under \$1.
+
+Now, draw a scatter plot showing the relationship between the median household
+income and the median house value.
+
+```{r, question-02}
+ca %>%
+  ggplot(aes(median_household_income, median_house_value)) +
+    geom_point()
+```
+
+How would you describe this relationship? Is it surprising or as you would
+expect? **Answer**: In general, areas with a higher median income have more
+expensive houses, but the relationship has a lot of noise.
+
+Now show the relationship between the mean household income and the median
+house value.
+
+```{r, question-03}
+ca %>%
+  ggplot(aes(mean_household_income, median_house_value)) +
+    geom_point()
+```
+
+How does this compare to the previous plot? **Answer**: The relationship is
+very similiar, and hard to differentiate just by a quick glance.
+
+And now, show the relationship between the mean household income and
+the median household income. Add a line with a slope of 1 with the following
+layer: `geom_abline(slope = 1, color = "orange")`.
+
+```{r, question-04}
+ca %>%
+  ggplot(aes(median_household_income, mean_household_income)) +
+    geom_point() +
+    geom_abline(slope = 1, color = "orange")
+```
+
+You should see that the mean and median income are highly correlated.
+Which one tends to be slightly higher? Can you think of why the data are
+distributed like this? **Answer**: The mean income ranges from right around
+the median income (these are areas that likely have decent income equality)
+to many times larger than this. These larger regions have a heavy tail with
+a small number of higher earners pushing the mean income higher.
+
+Finally, draw a scatter plot with longitude and latitude on the x- and y-axes.
+Color the points according to the median house value and include the scale
+`scale_color_viridis_c()`. You might also decrease the size to make the plot
+easier to read.
+
+```{r, question-05}
+ca %>%
+  ggplot(aes(longitude, latitude)) +
+    geom_point(aes(color = median_house_value), size = 0.5) +
+    scale_color_viridis_c()
+```
+
+See if you can identify the San Francisco, Los Angeles, and San Diego
+metro regions. Where do you see the highest house values? How about the
+lowest house values? **Answer**: The highest house values are in the three
+large metro areas, particularly San Francisco. Lowest prices are inland.
+
+### Simple Linear Models
+
+Now, produce a linear model that predicts the median house value as a function
+of the median household income. Make sure to use only the training data. Print
+out a summary of the model.
+
+```{r, question-06}
+model <- ca %>%
+  filter(train_id == "train") %>%
+  lm(median_house_value ~ median_household_income, data = .)
+
+summary(model)
+```
+
+Describe in words what the model thinks is the relationship between the
+median household income and the median house value. **Answer**: The model
+thinks that each extra dollar of median household income increases the typically
+value of the house value by \$4.75.
+
+Using the model you just created, compute the RMSE for the training and
+validation sets.
+
+```{r, question-07}
+ca %>%
+  mutate(value_pred_lm = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((median_house_value - value_pred_lm)^2)))
+```
+
+It's hard to see how good this prediction is without a reference point.
+Compute the RMSE that comes from using the mean of the median house value
+as a predictor.
+
+```{r, question-08}
+ca %>%
+  mutate(value_pred_const = mean(median_house_value)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((median_house_value - value_pred_const)^2)))
+```
+
+How does the RMSE of the linear model compare to the constant model? Does the
+linear model seem to perform significantly better? **Answer**: Yes! The simple
+model has an RMSE just under 200 whereas the linear regression is around 154.
+
+To illustrate the linear model, draw a scatter plot with median household
+income on the x-axis, median house value on the y-axis, and a line showing
+the predicted linear model.
+
+```{r, question-09}
+ca %>%
+  mutate(value_pred_lm = predict(model, newdata = .)) %>%
+  ggplot(aes(median_household_income, median_house_value)) +
+    geom_point() +
+    geom_line(aes(y = value_pred_lm), color = "orange", size = 1.5)
+```
+
+Confirm that the linear seems to pass through the cloud of data in a reasonable
+way.
+
+Now, produce a linear regression model that uses the mean household income to
+predict the median house value. Print out a summary of the model.
+
+```{r, question-10}
+model <- ca %>%
+  filter(train_id == "train") %>%
+  lm(median_house_value ~ mean_household_income, data = .)
+
+summary(model)
+```
+
+How do the slope and intercept compare to the previous model? **Answer**: The
+slope is actually quite close (4.5 instead of 4.75). The intercept is lower 
+though, likely to account for the fact that the mean household income often
+being larger than the median household income.
+
+Now, compute the RMSE of this model.
+
+```{r, question-11}
+ca %>%
+  mutate(value_pred_lm = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((median_house_value - value_pred_lm)^2)))
+```
+
+Which seems to be a more powerful estimator, the mean income or the median
+income of each region? **Answer**: The mean income has an RMSE around 138, 
+less than the previous model. It seems that mean income is a better predictor
+than median income.
+
+### Multivariate Linear Models
+
+We will finish by producing multivariate linear regression models using more
+than one predictor variable. Fit a regression model that uses both the mean
+household income and the median household income to predict the house value.
+Print out a summary of the model.
+
+```{r, question-12}
+model <- ca %>%
+  filter(train_id == "train") %>%
+  lm(median_house_value ~ mean_household_income + median_household_income, data = .)
+
+summary(model)
+```
+
+What are the signs of the slope parameters? Do these surprise you?
+**Answer**: The mean household income has a positive sign, but the median
+household income has a negative sign. The phenomenon of a parameter switching
+sign in a multivariate model is common when we have two highly-correlated
+variables.
+
+Compute the RMSE of this new model on the training and validation sets.
+
+```{r, question-13}
+ca %>%
+  mutate(value_pred_lm = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((median_house_value - value_pred_lm)^2)))
+```
+
+How does this compare to the RMSE of the previous models? **Answer**: The 
+RMSE decreases very slightly compared to the previous model, from 138.5 down
+to 136.5.
+
+Produce a scatter plot with median household income on the x-axis, mean
+household income on the y-axis, and the points colored according the predicted
+value from the linear model. Use the viridis color scale mentioned in the
+previous question.
+
+```{r, question-14}
+ca %>%
+  mutate(value_pred_lm = predict(model, newdata = .)) %>%
+  ggplot(aes(median_household_income, mean_household_income)) +
+    geom_point(aes(color = value_pred_lm)) +
+    scale_color_viridis_c()
+```
+
+Can you see the effect of the two different coefficients that were found in
+the linear regression model?
+
+### Build Your Own
+
+Before finishing, try to build a more predictive model using any other variables
+that you think might be useful. Compute the RMSE of the training and validation
+set and feel free to iterate a few times to get the best fit.
+
+```{r, question-15}
+model <- ca %>%
+  filter(train_id == "train") %>%
+  lm(median_house_value ~ mean_household_income +
+                          median_household_income +
+                          latitude +
+                          longitude +
+                          mean_household_size_renters +
+                          built_1939_or_earlier +
+                          bedrooms_1 +
+                          bedrooms_2, data = .)
+
+ca %>%
+  mutate(value_pred_lm = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((median_house_value - value_pred_lm)^2)))
+```
+
+I was able to get a model with an RMSE just slightly above 100.

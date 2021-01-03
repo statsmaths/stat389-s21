@@ -500,12 +500,250 @@ summary {
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(smodels)</span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(cleanNLP)</span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Matrix)</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">theme_set</span>(<span class="fu">theme_minimal</span>())</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">dplyr.summarise.inform =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">width =</span> 77L)</span></code></pre></div>
-<div id="section" class="section level2">
-<h2></h2>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(xgboost)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(stringi)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">theme_set</span>(<span class="fu">theme_minimal</span>())</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">dplyr.summarise.inform =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">width =</span> 77L)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">sparse.colnames =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<div id="five-british-authors" class="section level2">
+<h2>Five British Authors</h2>
+<p>The data set will look at today consists of short passages from five well-known British authors: Jane Austen, Charles Dickens, Sir Arthur Conan Doyle, Robert Louis Stevenson, and H.G. Wells. The prediction task for this data set is to determine the author. We start by reading in the data:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>stylo <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">&quot;data/stylo_uk.csv&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">train_id =</span> <span class="fu">if_else</span>(<span class="fu">runif</span>(<span class="fu">n</span>()) <span class="sc">&lt;</span> <span class="fl">0.6</span>, <span class="st">&quot;train&quot;</span>, <span class="st">&quot;valid&quot;</span>))</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>token <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">&quot;data/stylo_uk_token.csv.gz&quot;</span>)</span></code></pre></div>
+<div id="pos-n-grams" class="section level3">
+<h3>POS N-grams</h3>
+<p>A powerful feature for learning authorship style is too look at the frequency of part of speech n-grams (usually up to order 3 or 4). This can be done with either the universal part of speech codes or the more granular codes in the <code>xpos</code> variable. Let’s create a data matrix with trigrams. Keep in mind that we probably want to have <code>max_df = 1</code> here.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> token <span class="sc">%&gt;%</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sm_ngram</span>(<span class="at">n =</span> <span class="dv">3</span>, <span class="at">n_min =</span> <span class="dv">1</span>, <span class="at">token_var =</span> <span class="st">&quot;upos&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cnlp_utils_tf</span>(<span class="at">doc_set =</span> stylo<span class="sc">$</span>doc_id,</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>                <span class="at">min_df =</span> <span class="fl">0.005</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>                <span class="at">max_df =</span> <span class="dv">1</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>                <span class="at">max_features =</span> <span class="dv">10000</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>                <span class="at">token_var =</span> <span class="st">&quot;token&quot;</span>)</span></code></pre></div>
+<p>And just to understand what the data set looks like, here are a few rows and columns from the data matrix.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>X[<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>, <span class="fu">c</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>, <span class="dv">51</span><span class="sc">:</span><span class="dv">52</span>, <span class="dv">1000</span><span class="sc">:</span><span class="dv">1001</span>)]</span></code></pre></div>
+<pre><code>## 10 x 6 sparse Matrix of class &quot;dgCMatrix&quot;
+##          PUNCT NOUN VERB ADV NOUN VERB PRON SPACE AUX AUX ADP
+## doc00001    11    9        .         1          .           .
+## doc00002    13   18        4         1          .           .
+## doc00003    25   48        1         4          .           .
+## doc00004    21   20        2         2          .           .
+## doc00005     6    1        1         .          .           .
+## doc00006    14   12        1         1          .           1
+## doc00007    17   13        2         2          .           .
+## doc00008    23   12        .         .          .           .
+## doc00009    25   19        1         .          .           .
+## doc00010    10    4        .         .          .           .</code></pre>
+<p>We could plug this data matrix into a penalized regression model, and it would likely perform relatively well. However, today we will use it to illustrate a different class of models, which I call <em>local models</em>. Whereas regression tries to learn specific weights attached to each variable, local models focus on make predictions base on the training data most similar to the point where one wants to make a prediction.</p>
+<p>We will discuss three different local models and then step-back to talk about their relative strengths and weaknesses compared to <em>global</em> models that are similar to linear regression.</p>
+</div>
+<div id="k-nearest-neighbors" class="section level3">
+<h3>K-nearest neighbors</h3>
+<p>Our first estimator is called K-nearest neighbors, or KNN. It is the quintessential local model. In order to make a prediction at a point, the k closest points in the training data are taken and a prediction is made by averaging their response values. In the case of classification, the class most common to the neighborhood is used (ties being broken by sequentially removing the farthest-away training data points).</p>
+<p>In order to run the KNN algorithm, we need to create a response vector and training matrix:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>y <span class="ot">&lt;-</span> stylo<span class="sc">$</span>author</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>y_train <span class="ot">&lt;-</span> y[stylo<span class="sc">$</span>train_id <span class="sc">==</span> <span class="st">&quot;train&quot;</span>]</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>X_train <span class="ot">&lt;-</span> X[stylo<span class="sc">$</span>train_id <span class="sc">==</span> <span class="st">&quot;train&quot;</span>,]</span></code></pre></div>
+<p>Then, we load the package <strong>FNN</strong> (Fast nearest neighbors) and use the <code>knn</code> function. We start by setting k equal to 4. Unlike linear regression, there is no specific <em>model</em> per say. The algorithm jumps right to the predictions, which we will save as a new vector in R.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(FNN)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>y_hat <span class="ot">&lt;-</span> <span class="fu">knn</span>(X_train, X, y_train, <span class="at">k =</span> <span class="dv">4</span>)</span></code></pre></div>
+<p>After the algorithm finishes, we can see how predictive the model is:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>stylo <span class="sc">%&gt;%</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">author_pred =</span> y_hat) <span class="sc">%&gt;%</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(train_id) <span class="sc">%&gt;%</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">class_rate =</span> <span class="fu">mean</span>(author_pred <span class="sc">==</span> author))</span></code></pre></div>
+<pre><code>## # A tibble: 2 x 2
+##   train_id class_rate
+##   &lt;chr&gt;         &lt;dbl&gt;
+## 1 train         0.645
+## 2 valid         0.430</code></pre>
+<p>It predicts the correct class 42% of the time. Not too bad given that there are 5 different authors. Let’s see the confusion matrix to see if there are any authors that are particularly easy or difficult to distinguish:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>stylo <span class="sc">%&gt;%</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">author_pred =</span> y_hat) <span class="sc">%&gt;%</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(author, author_pred, train_id) <span class="sc">%&gt;%</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">table</span>()</span></code></pre></div>
+<pre><code>## , , train_id = train
+## 
+##            author_pred
+## author      Austen Dickens Doyle Stevenson Wells
+##   Austen      1356     129   133        94   119
+##   Dickens      215    1191   140       103   163
+##   Doyle        180     212  1103       100   204
+##   Stevenson    225     257   158      1024   172
+##   Wells         91     199   210       124  1182
+## 
+## , , train_id = valid
+## 
+##            author_pred
+## author      Austen Dickens Doyle Stevenson Wells
+##   Austen       639     190   170       103   117
+##   Dickens      221     553   178       132   154
+##   Doyle        167     240   476       124   244
+##   Stevenson    224     239   165       416   170
+##   Wells        100     226   211       140   567</code></pre>
+<p>I don’t see any particularly strong patterns here, though it does seem that Jane Austin is a bit easier to distinguish that the other four authors.</p>
+<p>We can modify the model by increasing the number of neighbors under consideration. We can try 10 here, for example:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(FNN)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>y_hat <span class="ot">&lt;-</span> <span class="fu">knn</span>(X_train, X, y_train, <span class="at">k =</span> <span class="dv">10</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>stylo <span class="sc">%&gt;%</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">author_pred =</span> y_hat) <span class="sc">%&gt;%</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(train_id) <span class="sc">%&gt;%</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="fu">mean</span>(author_pred <span class="sc">==</span> author))</span></code></pre></div>
+<pre><code>## # A tibble: 2 x 2
+##   train_id `mean(author_pred == author)`
+##   &lt;chr&gt;                            &lt;dbl&gt;
+## 1 train                            0.581
+## 2 valid                            0.474</code></pre>
+<p>And we see that the classification rate improves to 47%. Note that the training set classification rate decreases to 59%. We could experiment with k a bit more to get the best fit, which usually comes by getting the training and validation classification rates fairly close.</p>
+</div>
+<div id="decision-trees" class="section level3">
+<h3>Decision Trees</h3>
+<p>The next model I want to consider are decision trees. We won’t use this directly in this course, but they will be used as a building block for the next model we will discuss.</p>
+<p>Because we are not going to use these models directly (there is no good R package for running simple decision trees), let’s look at this model using this resource: <a href="http://www.r2d3.us/visual-intro-to-machine-learning-part-1/">A visual introduction to machine learning</a>. It has the benefit of giving great visual intuition for the model as well as reviewing some keep machine learning concepts.</p>
+</div>
+<div id="gradient-boosted-trees" class="section level3">
+<h3>Gradient Boosted Trees</h3>
+<p>An individual decision tree is often not a particularly powerful model for complex prediction tasks. However, the idea of a tree-based model is to learn an adaptive version of KNN. A clever way to increase the predictive power of a decision tree is to build a large collection of trees; prediction is then done by predicting on each individual tree and averaging (or taking the majority class) across the whole set. One such model is called a <em>random forest</em>. The one that we will look at here is a <em>gradient boosted tree</em>, or <em>gradient boosted machine</em> (GBM). For a continuous response, the algorithm works something like this:</p>
+<ul>
+<li>select a random subset of the training data</li>
+<li>build a decision tree with the selected training data to predict the response variable</li>
+<li>take the predictions from this first tree, multiply by a fixed parameter called the <em>learning rate</em> (say, 0.01), and compute the residuals for the entire training set</li>
+<li>take another random subset of the training data</li>
+<li>building a decision tree with the selected training data to predict the residuals from the first model</li>
+<li>repeat this process many times</li>
+</ul>
+<p>If you prefer a mathematical description, if the fitted values from the t-th tree are given by:</p>
+<p><span class="math display">\[ \widehat{Y_i^t} \]</span></p>
+<p>Then we train the k-th tree on the values Z given by:</p>
+<p><span class="math display">\[ Z_i = Y_i - \eta \cdot \sum_{t = 1}^{k - 1} \widehat{Y_i^t} \]</span></p>
+<p>The parameter eta is the learning rate. If set to one, this is exactly fitting on the residuals of the prior trees. Setting to less than one stop the trees from overfitting on the first few trees.</p>
+<p>The details for classification tasks are a bit more complex, but the general ideas are the same. To run gradient boosted trees, we will use the <strong>xgboost</strong> package, which has a very fast implementation of a learning algorithm. It requires us to convert our categorical <code>author</code> variable into an integer starting at 0:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>author_set <span class="ot">&lt;-</span> <span class="fu">unique</span>(stylo<span class="sc">$</span>author)</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>y <span class="ot">&lt;-</span> (<span class="fu">match</span>(stylo<span class="sc">$</span>author, author_set) <span class="sc">-</span> 1L)</span></code></pre></div>
+<p>Then, we create training and validation sets, which are converted into an efficient data structure by the function <code>xgb.DMatrix</code>.</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>y_train <span class="ot">&lt;-</span> y[stylo<span class="sc">$</span>train_id <span class="sc">==</span> <span class="st">&quot;train&quot;</span>]</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>y_valid <span class="ot">&lt;-</span> y[stylo<span class="sc">$</span>train_id <span class="sc">==</span> <span class="st">&quot;valid&quot;</span>]</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>X_train <span class="ot">&lt;-</span> X[stylo<span class="sc">$</span>train_id <span class="sc">==</span> <span class="st">&quot;train&quot;</span>,]</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>X_valid <span class="ot">&lt;-</span> X[stylo<span class="sc">$</span>train_id <span class="sc">==</span> <span class="st">&quot;valid&quot;</span>,]</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>data_train <span class="ot">&lt;-</span> <span class="fu">xgb.DMatrix</span>(<span class="at">data =</span> X_train, <span class="at">label =</span> y_train)</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>data_valid <span class="ot">&lt;-</span> <span class="fu">xgb.DMatrix</span>(<span class="at">data =</span> X_valid, <span class="at">label =</span> y_valid)</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>watchlist <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">train=</span>data_train, <span class="at">valid=</span>data_valid)</span></code></pre></div>
+<p>Then, we train the actual model using the <code>xgb.train</code> function. We set the depth of the decision tree (here, 3), the learning rate (here, 0.05), and the number of trees to build (here, 10). The number of threads is just a computational details about how many cores to run on your machine. We also have to indicate the number of classes (5) and tell xgboost that we are running a multiclass prediction.</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>model <span class="ot">&lt;-</span> <span class="fu">xgb.train</span>(<span class="at">data =</span> data_train,</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">max_depth =</span> <span class="dv">3</span>, <span class="at">eta =</span> <span class="fl">0.05</span>, <span class="at">nthread =</span> <span class="dv">2</span>,</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>                 <span class="at">nrounds =</span> <span class="dv">10</span>, <span class="at">objective =</span> <span class="st">&quot;multi:softmax&quot;</span>,</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>                 <span class="at">watchlist =</span> watchlist, <span class="at">verbose =</span> <span class="cn">TRUE</span>, <span class="at">num_class =</span> <span class="dv">5</span>)</span></code></pre></div>
+<pre><code>## [1]  train-merror:0.534896   valid-merror:0.551735 
+## [2]  train-merror:0.532255   valid-merror:0.546708 
+## [3]  train-merror:0.526750   valid-merror:0.542491 
+## [4]  train-merror:0.526860   valid-merror:0.544924 
+## [5]  train-merror:0.521797   valid-merror:0.538923 
+## [6]  train-merror:0.522567   valid-merror:0.539572 
+## [7]  train-merror:0.513540   valid-merror:0.529355 
+## [8]  train-merror:0.512550   valid-merror:0.529030 
+## [9]  train-merror:0.509357   valid-merror:0.527571 
+## [10] train-merror:0.509247   valid-merror:0.522381</code></pre>
+<p>You can see that the function prints out the training and validation error rates (1 minus the classification rate) after each step. We can do slightly better by decreasing the learning rate and increasing the number of trees. I will turn off (<code>verbose = FALSE</code>) the print out given larger number of trees.</p>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>model <span class="ot">&lt;-</span> <span class="fu">xgb.train</span>(<span class="at">data =</span> data_train,</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>                 <span class="at">max_depth =</span> <span class="dv">3</span>, <span class="at">eta =</span> <span class="fl">0.03</span>, <span class="at">nthread =</span> <span class="dv">2</span>,</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>                 <span class="at">nrounds =</span> <span class="dv">100</span>, <span class="at">objective =</span> <span class="st">&quot;multi:softmax&quot;</span>,</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>                 <span class="at">watchlist =</span> watchlist, <span class="at">verbose =</span> <span class="cn">FALSE</span>, <span class="at">num_class =</span> <span class="dv">5</span>)</span></code></pre></div>
+<p>Let’s see how well this model predicts the classes in our data:</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>y_hat <span class="ot">&lt;-</span> author_set[<span class="fu">predict</span>(model, <span class="at">newdata =</span> X) <span class="sc">+</span> <span class="dv">1</span>]</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>stylo <span class="sc">%&gt;%</span></span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">author_pred =</span> y_hat) <span class="sc">%&gt;%</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(train_id) <span class="sc">%&gt;%</span></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="fu">mean</span>(author_pred <span class="sc">==</span> author))</span></code></pre></div>
+<pre><code>## # A tibble: 2 x 2
+##   train_id `mean(author_pred == author)`
+##   &lt;chr&gt;                            &lt;dbl&gt;
+## 1 train                            0.578
+## 2 valid                            0.540</code></pre>
+<p>It manages about 54%, better than before and better than the KNN model we built in the previous section. One useful benefit of the gradient boosted trees over KNN is that the former also provides variable importance scores:</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>importance_matrix <span class="ot">&lt;-</span> <span class="fu">xgb.importance</span>(<span class="at">model =</span> model)</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>importance_matrix</span></code></pre></div>
+<pre><code>##              Feature         Gain        Cover    Frequency
+##   1:            PART 9.097690e-02 5.023466e-02 0.0323134115
+##   2:     PROPN PROPN 5.827316e-02 3.757759e-02 0.0268801830
+##   3:           PUNCT 5.452666e-02 4.358776e-02 0.0308836145
+##   4:     SPACE PROPN 4.988523e-02 3.080901e-02 0.0157277667
+##   5:      PUNCT VERB 4.472816e-02 3.885327e-02 0.0183014012
+##  ---                                                       
+## 223: PUNCT PROPN ADP 2.919385e-05 8.664961e-05 0.0002859594
+## 224: PUNCT PRON VERB 2.834208e-05 1.569333e-06 0.0002859594
+## 225:    ADV NOUN ADP 2.593286e-05 3.584618e-05 0.0002859594
+## 226:    ADP ADJ NOUN 2.193063e-05 1.915154e-06 0.0008578782
+## 227:         ADJ ADP 2.664031e-06 1.050506e-06 0.0002859594</code></pre>
+<p>Finally, let’s create a confusion matrix for our model:</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>y_hat <span class="ot">&lt;-</span> author_set[<span class="fu">predict</span>(model, <span class="at">newdata =</span> X) <span class="sc">+</span> <span class="dv">1</span>]</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>stylo <span class="sc">%&gt;%</span></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">pred =</span> y_hat) <span class="sc">%&gt;%</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(author, pred, train_id) <span class="sc">%&gt;%</span></span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">table</span>()</span></code></pre></div>
+<pre><code>## , , train_id = train
+## 
+##            pred
+## author      Austen Dickens Doyle Stevenson Wells
+##   Austen      1258     151   171        80   171
+##   Dickens      249     940   169       204   250
+##   Doyle        150     185   870       169   425
+##   Stevenson    199     219   166       970   282
+##   Wells         70     181   153       185  1217
+## 
+## , , train_id = valid
+## 
+##            pred
+## author      Austen Dickens Doyle Stevenson Wells
+##   Austen       784     122   116        76   121
+##   Dickens      201     586   114       154   183
+##   Doyle        132     145   534       138   302
+##   Stevenson    147     142   137       599   189
+##   Wells         31     130   116       140   827</code></pre>
+<p>Here we see that on the validation set, the gradient boosted trees have done a better job classifying Jane Austen and H.G. Wells (around 800 correct classifications compared to 600 with KNN) relative to the other three.</p>
+</div>
+</div>
+<div id="thoughts-on-local-models" class="section level2">
+<h2>Thoughts on local models</h2>
+<p>We will continue to make the heaviest use of regression-based models, but the local models we covered today (particularly gradient boosted trees) will be useful to augment these, particularly when looking at features that benefit from determining interaction terms, such as POS N-grams. In machine learning competitions, particularly those on non-image and non-textual data, gradient boosted trees are very often the winning model. They can, however, take a bit of tuning to get right. Usually this consists in slowly lowering the learning rate and increasing the number of trees until the model <em>saturates</em> (no longer improves).</p>
+</div>
+<div id="standardizing-the-training-matrix" class="section level2">
+<h2>Standardizing the training matrix</h2>
+<p>One last thing to note today is that when working with features such as POS tags, particularly if the input texts are different lengths, it can be useful to try to standardize the TF matrix so that sum of each row is the same. This can be done with the following code:</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> X <span class="sc">/</span> <span class="fu">apply</span>(X, <span class="dv">1</span>, sum)</span></code></pre></div>
+<p>The counts now become proportions rather than raw counts:</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>X[<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>, <span class="fu">c</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>, <span class="dv">51</span><span class="sc">:</span><span class="dv">52</span>, <span class="dv">1000</span><span class="sc">:</span><span class="dv">1001</span>)]</span></code></pre></div>
+<pre><code>## 10 x 6 sparse Matrix of class &quot;dgCMatrix&quot;
+##               PUNCT       NOUN    VERB ADV   NOUN VERB PRON SPACE
+## doc00001 0.04761905 0.03896104 .           0.004329004          .
+## doc00002 0.04609929 0.06382979 0.014184397 0.003546099          .
+## doc00003 0.04251701 0.08163265 0.001700680 0.006802721          .
+## doc00004 0.04046243 0.03853565 0.003853565 0.003853565          .
+## doc00005 0.04800000 0.00800000 0.008000000 .                    .
+## doc00006 0.03422983 0.02933985 0.002444988 0.002444988          .
+## doc00007 0.05743243 0.04391892 0.006756757 0.006756757          .
+## doc00008 0.08745247 0.04562738 .           .                    .
+## doc00009 0.04930966 0.03747535 0.001972387 .                    .
+## doc00010 0.07246377 0.02898551 .           .                    .
+##          AUX AUX ADP
+## doc00001 .          
+## doc00002 .          
+## doc00003 .          
+## doc00004 .          
+## doc00005 .          
+## doc00006 0.002444988
+## doc00007 .          
+## doc00008 .          
+## doc00009 .          
+## doc00010 .</code></pre>
+<p>This will not always produce better estimates, but it is a useful feature to consider in authorship models.</p>
 </div>
 
 

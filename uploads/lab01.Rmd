@@ -2,3 +2,202 @@
 title: "Lab 01"
 output: html_document
 ---
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+library(Matrix)
+library(glmnet)
+library(cleanNLP)
+library(magrittr)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+```
+
+This is the first "lab" for the semester. I have included several empty code
+chunks and text prompts that start with "**Answer:**". You should fill in
+solutions to these (code in the first case and a short answer in the second).
+These are not handed in or graded and solutions will be posted for next class.
+I suggest generally working as a group with a single shared screen, but you
+might want to also duplicate the code in your own machine.
+
+## California House Prices
+
+In this lab you will apply the methods shown in the notes to a data set of
+housing prices from California. Our variable of interest is the median
+house sale price in each census tract.
+
+```{r, message=FALSE}
+set.seed(1)
+
+ca <- read_csv(file.path("data", "ca_house_price.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+ca
+```
+There are several numeric variables that you can use to predict the output,
+all of which should be reasonably self-explanatory.
+
+### Exploring the Data
+
+To start, draw a histogram with 15 bins showing the distribution of the
+median house value variable:
+
+```{r, question-01}
+
+```
+
+What are the most typical values of the variable (they are given in
+thousands of dollars)? **Answer**:
+
+Now, draw a scatter plot showing the relationship between the median household
+income and the median house value.
+
+```{r, question-02}
+
+```
+
+How would you describe this relationship? Is it surprising or as you would
+expect? **Answer**:
+
+Now show the relationship between the mean household income and the median
+house value.
+
+```{r, question-03}
+
+```
+
+How does this compare to the previous plot? **Answer**:
+
+And now, show the relationship between the mean household income and
+the median household income. Add a line with a slope of 1 with the following
+layer: `geom_abline(slope = 1, color = "orange")`.
+
+```{r, question-04}
+
+```
+
+You should see that the mean and median income are highly correlated.
+Which one tends to be slightly higher? Can you think of why the data are
+distributed like this? **Answer**:
+
+Finally, draw a scatter plot with longitude and latitude on the x- and y-axes.
+Color the points according to the median house value and include the scale
+`scale_color_viridis_c()`. You might also decrease the size to make the plot
+easier to read.
+
+```{r, question-05}
+
+```
+
+See if you can identify the San Francisco, Los Angeles, and San Diego
+metro regions. Where do you see the highest house values? How about the
+lowest house values? **Answer**:
+
+### Simple Linear Models
+
+Now, produce a linear model that predicts the median house value as a function
+of the median household income. Make sure to use only the training data. Print
+out a summary of the model.
+
+```{r, question-06}
+
+```
+
+Describe in words what the model thinks is the relationship between the
+median household income and the median house value. **Answer**:
+
+Using the model you just created, compute the RMSE for the training and
+validation sets.
+
+```{r, question-07}
+
+```
+
+It's hard to see how good this prediction is without a reference point.
+Compute the RMSE that comes from using the mean of the median house value
+as a predictor.
+
+```{r, question-08}
+
+```
+
+How does the RMSE of the linear model compare to the constant model? Does the
+linear model seem to perform significantly better? **Answer**:
+
+To illustrate the linear model, draw a scatter plot with median household
+income on the x-axis, median house value on the y-axis, and a line showing
+the predicted linear model.
+
+```{r, question-09}
+
+```
+
+Confirm that the linear seems to pass through the cloud of data in a reasonable
+way.
+
+Now, produce a linear regression model that uses the mean household income to
+predict the median house value. Print out a summary of the model.
+
+```{r, question-10}
+
+```
+
+How do the slope and intercept compare to the previous model? **Answer**:
+
+Now, compute the RMSE of this model.
+
+```{r, question-11}
+
+```
+
+Which seems to be a more powerful estimator, the mean income or the median
+income of each region? **Answer**:
+
+### Multivariate Linear Models
+
+We will finish by producing multivariate linear regression models using more
+than one predictor variable. Fit a regression model that uses both the mean
+household income and the median household income to predict the house value.
+Print out a summary of the model.
+
+```{r, question-12}
+
+```
+
+What are the signs of the slope parameters? Do these surprise you?
+**Answer**:
+
+Compute the RMSE of this new model on the training and validation sets.
+
+```{r, question-13}
+
+```
+
+How does this compare to the RMSE of the previous models? **Answer**:
+
+Produce a scatter plot with median household income on the x-axis, mean
+household income on the y-axis, and the points colored according the predicted
+value from the linear model. Use the viridis color scale mentioned in the
+previous question.
+
+```{r, question-14}
+
+```
+
+Can you see the effect of the two different coefficients that were found in
+the linear regression model?
+
+### Build Your Own
+
+Before finishing, try to build a more predictive model using any other variables
+that you think might be useful. Compute the RMSE of the training and validation
+set and feel free to iterate a few times to get the best fit.
+
+```{r, question-15}
+
+```
+
+I was able to get a model with an RMSE just slightly above 100.

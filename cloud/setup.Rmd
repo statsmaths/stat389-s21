@@ -20,7 +20,7 @@ install.packages(
     "tidyverse", "Hmisc", "irlba", "devtools", "umap", "glmnet",
     "remotes", "tidyverse", "knitr", "rmarkdown", "igraph", "lwgeom",
     "RcppRoll", "glmnet", "tokenizers", "udpipe", "cld3", "topicmodels",
-    "xgboost"
+    "xgboost", "FNN"
   )
 )
 ```
