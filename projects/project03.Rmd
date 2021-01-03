@@ -19,8 +19,81 @@ Sys.setlocale("LC_TIME", "en_US.UTF-8")
 
 **Due Date**: 25 March 2021
 
+## General Instructions
+
 This page outlines the instructions for the first project. You should
 have a file `project03.Rmd` in your RStudio workspace where you can
-work on the project.
+work on the project. I find that students prefer having a consistent
+format for the projects, so I will attempt to keep the format the same
+throughout the semester.
 
-## Instructions
+On the due-date, your group is responsible for completing three elements:
+
+1. A short (about one-page single spaced) description of your work answering
+a subset of the questions below. Please submit as a Google Doc in your shared
+group Google Drive folder.
+2. A Google Slides presentation of your results, also submitted in your shared
+drive folder.
+3. Giving a presentation based on your slide show. This should be 8-10 minutes
+in length. I suggest having one member drive the slides and the others rotate
+describing the results.
+
+As described on the syllabus, the project will be graded as either Satisfactory
+or Unsatisfactory. I will provide additional feedback that you can address in
+the next project.
+
+## Specific Instructions
+
+The data for this project is similar to the previous one, but this time reviews
+come from Yelp. I created the data set based on what is provided by the
+[Yelp Open Dataset](https://www.yelp.com/dataset/) project. As with before, I
+have selected reviewers with a large number of reviews. The prediction task is
+once again to predict who authored a review based on the text of the review.
+Each group has been assigned reviews from a different city.
+
+As starting prompts, you can begin with the same questions posed in the previous
+notebook. However, I would also like you to consider the new methods we have
+learned for describing individual documents as vector. For this, do not consider
+the individual reviews (there are too many!); instead treat all of the text
+for a single author into a single "document". With this data set, here are
+some things to investigate:
+
+- What are some words that characterize each author?
+- Describe the similarity between the authors based on word usage. Are there
+pairs or groups that are very similar? Author(s) that are very different than
+the others?
+- Describe the sililarity between the authors based on POS n-grams.
+- Pick an other or groups of authors and describe them relative to the rest of
+the collection. Do the review certain types of places? Are they in specific
+parts of the city?
+
+As always, the specifics are up to your group and what you find interesting.
+However, you should address something from both the supervised and unsupervised
+learning tasks for your presentation.
+
+## Groups
+
+Each group is working with a different city's data. You should be able to
+download your data set from within the `project03.Rmd` file.
+
+**Group 1**: `toronto`
+
+**Group 2**: `calgary`
+
+**Group 3**: `pittsburgh`
+
+**Group 4**: `phoenix`
+
+**Group 5**: `madison`
+
+**Group 6**: `las-vegas`
+
+**Group 7**: `cleveland`
+
+**Group 8**: `charlotte`
+
+## Notes
+
+While working through the project, I typically find that many groups ask for
+help writing the same bits of code. Any notes that I want to share about how
+to do specific tasks will be added here as we work through the project.

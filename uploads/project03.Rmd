@@ -8,18 +8,30 @@ library(tidyverse)
 library(ggrepel)
 library(smodels)
 library(stringi)
+library(Matrix)
+library(glmnet)
+library(cleanNLP)
+library(magrittr)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 ```
 
-# Project 1
+# Load and Download the Data
 
-The project instructions are linked to from the course website. This is just a
-template file to give you a space to work on the project. Start by running the
-code block above, and then use as many blocks below as needed to read in the
-dataset and create your graphic.
+```{r, message=FALSE}
+dname <- ""  # put the name assigned to your group here
 
-```{r}
+url_base <- "https://statsmaths.github.io/data-yelp/class"
+f_corpus <- file.path("data", sprintf("%s.csv.gz", dname))
+f_tokens <- file.path("data", sprintf("%s_token.csv.gz", dname))
+u_corpus <- sprintf("%s/%s.csv.gz", url_base, dname)
+u_tokens <- sprintf("%s/%s_token.csv.gz", url_base, dname)
+if (!file.exists(f_corpus)) { download.file(u_corpus, f_corpus) }
+if (!file.exists(f_tokens)) { download.file(u_tokens, f_tokens) }
 
+yelp <- read_csv(f_corpus)
+token <- read_csv(f_tokens)
 ```
+
+# Project Code

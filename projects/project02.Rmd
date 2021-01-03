@@ -19,8 +19,87 @@ Sys.setlocale("LC_TIME", "en_US.UTF-8")
 
 **Due Date**: 11 March 2021
 
+## General Instructions
+
 This page outlines the instructions for the first project. You should
 have a file `project02.Rmd` in your RStudio workspace where you can
-work on the project.
+work on the project. I find that students prefer having a consistent
+format for the projects, so I will attempt to keep the format the same
+throughout the semester.
 
-## Instructions
+On the due-date, your group is responsible for completing three elements:
+
+1. A short (about one-page single spaced) description of your work answering
+a subset of the questions below. Please submit as a Google Doc in your shared
+group Google Drive folder.
+2. A Google Slides presentation of your results, also submitted in your shared
+drive folder.
+3. Giving a presentation based on your slide show. This should be 8-10 minutes
+in length. I suggest having one member drive the slides and the others rotate
+describing the results.
+
+As described on the syllabus, the project will be graded as either Satisfactory
+or Unsatisfactory. I will provide additional feedback that you can address in
+the next project.
+
+## Specific Instructions
+
+This project uses a collection of product reviews from Amazon. I created it
+from the archive [here](https://nijianmo.github.io/amazon/index.html), produced
+by Jianmo Ni, Jiacheng Li, Julian McAuley. I have selected a collection of
+reviews from the most prolific reviewers. The classification task for the
+project is to be able to predict the author of a review. Each group has been
+assigned a different product category to work with (see assignments below).
+
+The goal of your project is to apply the methods we have developed so far to
+explore your corpus and understand what features distinguish the authors.
+Remember that the goal is not *just* to classify; we want to use the methods to
+understand the style of the authors so it can be useful to build a variety of
+models (some of which may be less predictive) in order to achieve this. Here
+are some things you should consider looking into:
+
+- How well can you classify the authors based on word usage?
+- Are any of the most predictive words surprising? You can use KWiC to figure
+out what is going on.
+- How well can you classify the authors based on ungrams/bigrams/trigrams of
+`upos` and/or `xpos` tags? How does this compare to the word usage? Compare
+the predictiveness of a local model with a penalized regression.
+- Are some authors particularly hard to classify? Easy to classify? Can you
+tell why?
+- How does adding covariates such as the number of stars increase the
+predictiveness of the model?
+- Do you think that the particular products that each person reviews is the
+main driver of you model? How could you remove this factor (and can you)?
+- Can you summarize the results in any interesting way?
+
+These are just some ideas to get you started. Feel free to go in a different
+direction if you find something interesting! Keep in mind that confusion
+matrices will be useful and that even classification rates around 30% are much
+better than random guessing when there are many classes.
+
+## Groups
+
+Each group is working with a different product category. You should be able to
+download your data set from within the `project02.Rmd` file.
+
+**Group 1**: `grocery`
+
+**Group 2**: `movies_tv`
+
+**Group 3**: `kindle`
+
+**Group 4**: `pet_supplies`
+
+**Group 5**: `video_games`
+
+**Group 6**: `toys_games`
+
+**Group 7**: `tools`
+
+**Group 8**: `cds`
+
+## Notes
+
+While working through the project, I typically find that many groups ask for
+help writing the same bits of code. Any notes that I want to share about how
+to do specific tasks will be added here as we work through the project.

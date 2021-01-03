@@ -1,5 +1,5 @@
 ---
-title: "Notebook 13: Word Embeddings"
+title: "Notebook 13: Spectral Clustering"
 output:
   html_document:
     theme: cosmo
@@ -12,8 +12,35 @@ library(tidyverse)
 library(forcats)
 library(ggrepel)
 library(smodels)
+library(cleanNLP)
+library(magrittr)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
+```
+
+```{r, message=FALSE}
+wiki <- read_csv(file.path("data", "wiki_coffee_tea.csv"))
+token <- read_csv(file.path("data", "wiki_coffee_tea_token.csv.gz"))
+```
+
+```{r}
+X <- token %>%
+  filter(upos %in% c("NOUN", "ADJ", "ADV")) %>%
+  cnlp_utils_tfidf(min_df = 0.001, max_df = 0.5, doc_set = wiki$doc_id)
+```
+
+```{r}
+clusters <- sm_spectral_cluster(X, max_depth = 5, balance = FALSE)
+clusters
+```
+
+```{r}
+clusters %>%
+  sample_frac(size = 1) %>%
+  group_by(cluster) %>%
+  slice_head(n = 10) %>%
+  mutate(doc_id = paste(cluster, doc_id, sep = " => ")) %>%
+  use_series(doc_id)
 ```

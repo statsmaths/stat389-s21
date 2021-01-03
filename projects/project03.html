@@ -404,9 +404,44 @@ summary {
 
 
 <p><strong>Due Date</strong>: 25 March 2021</p>
-<p>This page outlines the instructions for the first project. You should have a file <code>project03.Rmd</code> in your RStudio workspace where you can work on the project.</p>
-<div id="instructions" class="section level2">
-<h2>Instructions</h2>
+<div id="general-instructions" class="section level2">
+<h2>General Instructions</h2>
+<p>This page outlines the instructions for the first project. You should have a file <code>project03.Rmd</code> in your RStudio workspace where you can work on the project. I find that students prefer having a consistent format for the projects, so I will attempt to keep the format the same throughout the semester.</p>
+<p>On the due-date, your group is responsible for completing three elements:</p>
+<ol style="list-style-type: decimal">
+<li>A short (about one-page single spaced) description of your work answering a subset of the questions below. Please submit as a Google Doc in your shared group Google Drive folder.</li>
+<li>A Google Slides presentation of your results, also submitted in your shared drive folder.</li>
+<li>Giving a presentation based on your slide show. This should be 8-10 minutes in length. I suggest having one member drive the slides and the others rotate describing the results.</li>
+</ol>
+<p>As described on the syllabus, the project will be graded as either Satisfactory or Unsatisfactory. I will provide additional feedback that you can address in the next project.</p>
+</div>
+<div id="specific-instructions" class="section level2">
+<h2>Specific Instructions</h2>
+<p>The data for this project is similar to the previous one, but this time reviews come from Yelp. I created the data set based on what is provided by the <a href="https://www.yelp.com/dataset/">Yelp Open Dataset</a> project. As with before, I have selected reviewers with a large number of reviews. The prediction task is once again to predict who authored a review based on the text of the review. Each group has been assigned reviews from a different city.</p>
+<p>As starting prompts, you can begin with the same questions posed in the previous notebook. However, I would also like you to consider the new methods we have learned for describing individual documents as vector. For this, do not consider the individual reviews (there are too many!); instead treat all of the text for a single author into a single “document”. With this data set, here are some things to investigate:</p>
+<ul>
+<li>What are some words that characterize each author?</li>
+<li>Describe the similarity between the authors based on word usage. Are there pairs or groups that are very similar? Author(s) that are very different than the others?</li>
+<li>Describe the sililarity between the authors based on POS n-grams.</li>
+<li>Pick an other or groups of authors and describe them relative to the rest of the collection. Do the review certain types of places? Are they in specific parts of the city?</li>
+</ul>
+<p>As always, the specifics are up to your group and what you find interesting. However, you should address something from both the supervised and unsupervised learning tasks for your presentation.</p>
+</div>
+<div id="groups" class="section level2">
+<h2>Groups</h2>
+<p>Each group is working with a different city’s data. You should be able to download your data set from within the <code>project03.Rmd</code> file.</p>
+<p><strong>Group 1</strong>: <code>toronto</code></p>
+<p><strong>Group 2</strong>: <code>calgary</code></p>
+<p><strong>Group 3</strong>: <code>pittsburgh</code></p>
+<p><strong>Group 4</strong>: <code>phoenix</code></p>
+<p><strong>Group 5</strong>: <code>madison</code></p>
+<p><strong>Group 6</strong>: <code>las-vegas</code></p>
+<p><strong>Group 7</strong>: <code>cleveland</code></p>
+<p><strong>Group 8</strong>: <code>charlotte</code></p>
+</div>
+<div id="notes" class="section level2">
+<h2>Notes</h2>
+<p>While working through the project, I typically find that many groups ask for help writing the same bits of code. Any notes that I want to share about how to do specific tasks will be added here as we work through the project.</p>
 </div>
 
 

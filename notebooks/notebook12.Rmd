@@ -12,8 +12,98 @@ library(tidyverse)
 library(forcats)
 library(ggrepel)
 library(smodels)
+library(cleanNLP)
+library(topicmodels)
+library(magrittr)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
+```
+
+```{r}
+source("wiki.R")
+```
+
+```{r}
+pages <- wiki_get_pages(c("Coffee", "Tea"), lang = "en")
+pages
+```
+
+```{r}
+exp_pages <- wiki_expand_pages(pages)
+select(exp_pages, page, lang)
+```
+
+```{r}
+wiki <- wiki_get_pages_text(exp_pages)
+select(wiki, page, sec_num, section)
+```
+
+```{r}
+wiki <- tapply(wiki$text, wiki$page, paste, collapse = " ")
+wiki <- tibble(doc_id = names(wiki), text = as.character(wiki))
+```
+
+```{r, eval=FALSE, echo=FALSE}
+library(reticulate)
+use_virtualenv("/Users/admin/gh/stat389-s21/env", required = TRUE)
+cnlp_init_spacy("en_core_web_sm")
+anno <- cnlp_annotate(wiki)
+
+token <- anno$token
+entity <- anno$entity
+
+write_csv(wiki, file.path("data", "wiki_coffee_tea.csv"))
+write_csv(token, file.path("data", "wiki_coffee_tea_token.csv.gz"))
+write_csv(entity, file.path("data", "wiki_coffee_tea_entity.csv.gz"))
+```
+
+```{r, message=FALSE}
+wiki <- read_csv(file.path("data", "wiki_coffee_tea.csv"))
+token <- read_csv(file.path("data", "wiki_coffee_tea_token.csv.gz"))
+```
+
+```{r}
+X <- token %>%
+  filter(upos %in% c("NOUN", "ADJ", "ADV")) %>%
+  cnlp_utils_tf(min_df = 0.001, max_df = 0.5, doc_set = wiki$doc_id)
+
+topic_model <- sm_lda_topics(X, num_topics = 16)
+```
+
+
+```{r}
+topic_docs <- topic_model$docs
+topic_terms <- topic_model$terms
+```
+
+
+```{r}
+topic_docs
+```
+
+
+```{r}
+topic_docs %>%
+  arrange(topic, desc(prob)) %>%
+  group_by(topic) %>%
+  slice_head(n = 10) %>%
+  group_by(topic) %>%
+  mutate(doc_id = paste(topic, doc_id, sep = " => ")) %>%
+  use_series(doc_id)
+```
+
+
+```{r}
+topic_terms
+```
+
+```{r}
+topic_terms %>%
+  arrange(topic, desc(beta)) %>%
+  group_by(topic) %>%
+  slice_head(n = 10) %>%
+  group_by(topic) %>%
+  summarize(sm_paste(token))
 ```

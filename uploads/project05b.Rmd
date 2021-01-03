@@ -1,0 +1,43 @@
+---
+title: "Project 05b"
+output: html_document
+---
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+library(Matrix)
+library(glmnet)
+library(cleanNLP)
+library(magrittr)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+```
+
+This is the project starter code for the 14h30 section.
+
+# Load and Download the Data
+
+```{r, message=FALSE}
+dname <- ""  # put the name assigned to your group here
+
+url_base <- "https://statsmaths.github.io/data-news/class"
+f_corpus <- file.path("data", sprintf("%s.csv.gz", dname))
+f_tokens <- file.path("data", sprintf("%s_token.csv.gz", dname))
+f_entity <- file.path("data", sprintf("%s_entity.csv.gz", dname))
+u_corpus <- sprintf("%s/%s.csv.gz", url_base, dname)
+u_tokens <- sprintf("%s/%s_token.csv.gz", url_base, dname)
+u_entity <- sprintf("%s/%s_entity.csv.gz", url_base, dname)
+if (!file.exists(f_corpus)) { download.file(u_corpus, f_corpus) }
+if (!file.exists(f_tokens)) { download.file(u_tokens, f_tokens) }
+if (!file.exists(f_entity)) { download.file(u_entity, f_entity) }
+
+news <- read_csv(f_corpus)
+token <- read_csv(f_tokens)
+ner <- read_csv(f_entity)
+```
+
+# Project Code

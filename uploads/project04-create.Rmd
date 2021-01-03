@@ -1,0 +1,69 @@
+---
+title: "Project 04 --- Create Data"
+output: html_document
+---
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+library(Matrix)
+library(glmnet)
+library(cleanNLP)
+library(magrittr)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+
+source("wiki.R")
+```
+
+You should use this file to create your dataset, and then use the other file
+to read in your data and run the analysis as with the other projects. This
+will help avoid needing to create the data set each time you are working with
+the project.
+
+Here, grab all of the links from one (or more) starter pages and see how many
+pages there are. Try to aim for somewhere between 100 and 1500 pages.
+
+```{r, message=FALSE}
+starter_page <- c()
+
+pages <- wiki_get_pages(starter_page, lang = "en")
+exp_pages <- wiki_expand_pages(pages)
+wiki <- wiki_get_pages_text(exp_pages)
+
+wiki <- tapply(wiki$text, wiki$page, paste, collapse = " ")
+wiki <- tibble(doc_id = names(wiki), text = as.character(wiki))
+
+print(nrow(wiki))
+```
+
+If you need to, after looking at the data, use the following code to remove
+any pages that you do not want in your analysis.
+
+```{r, message=FALSE}
+remove_these <- c()
+wiki <- wiki[!(wiki$doc_id %in% remove_these), ]
+```
+
+And then, run the udpipe annotator over your data. It will be a bit slower
+and not quite as accurate, as the spaCy annotator, but does not require setting
+up Python on your machine (a real pain for just this one assignment).
+
+```{r}
+cnlp_init_udpipe("english")
+token <- cnlp_annotate(wiki)$token
+```
+
+And finally, save the data set here:
+
+```{r}
+write_csv(wiki, file.path("data", "wiki_project04.csv"))
+write_csv(token, file.path("data", "wiki_project04_token.csv.gz"))
+```
+
+You can then read back into R using the code in `project04.Rmd`. If you don't
+find the results very interesting, or need to adjust anything, you can do it
+here

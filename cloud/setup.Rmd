@@ -19,7 +19,8 @@ install.packages(
     "readr", "ggplot2", "stringi", "forcats", "ggrepel", "tidyr",
     "tidyverse", "Hmisc", "irlba", "devtools", "umap", "glmnet",
     "remotes", "tidyverse", "knitr", "rmarkdown", "igraph", "lwgeom",
-    "RcppRoll", "glmnet", "tokenizers", "udpipe", "cld3", "topicmodels"
+    "RcppRoll", "glmnet", "tokenizers", "udpipe", "cld3", "topicmodels",
+    "xgboost"
   )
 )
 ```

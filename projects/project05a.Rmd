@@ -1,0 +1,92 @@
+---
+title: "Project 05a -- Instructions (11h00 Section)"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+
+theme_set(theme_minimal())
+options(pillar.min_character_chars = 15)
+Sys.setlocale("LC_TIME", "en_US.UTF-8")
+```
+
+**Due Date**: 22 April 2021
+
+
+## General Instructions
+
+This page outlines the instructions for the first project. You should
+have a file `project05a.Rmd` in your RStudio workspace where you can
+work on the project. I find that students prefer having a consistent
+format for the projects, so I will attempt to keep the format the same
+throughout the semester.
+
+On the due-date, your group is responsible for completing three elements:
+
+1. A short (about one-page single spaced) description of your work answering
+a subset of the questions below. Please submit as a Google Doc in your shared
+group Google Drive folder.
+2. A Google Slides presentation of your results, also submitted in your shared
+drive folder.
+3. Giving a presentation based on your slide show. This should be 8-10 minutes
+in length. I suggest having one member drive the slides and the others rotate
+describing the results.
+
+As described on the syllabus, the project will be graded as either Satisfactory
+or Unsatisfactory. I will provide additional feedback that you can address in
+the next project.
+
+## Specific Instructions
+
+The data for this project comes from the transcripts of six different cable
+news programs throughout the year 2018. Two are from MSNBC, two from CNN, and
+two from FoxNews. The original data was collected and distributed by the website
+[components.one](https://components.one/datasets/cable-news-transcripts). Each
+groups has been assigned a different set of weeks from the year to work with.
+
+The idea of this data set is to capture elements of all four of the previous
+projects. You should already have an idea of what projects in the class look
+like and what your classmates and I expect from a good presentation. You can
+pick any aspect(s) of the collection to look at: classifying the different
+presentors, building topic models, classifying the week of the transcript,
+or clustering the different broadcasts.
+
+Note that this data set is a significantly more messy than the others we have
+worked with this semester. For example, the transcripts contain errors and
+often include extra headers and footers. You may need to think about how to
+avoid this in your analysis.
+
+## Groups
+
+Each group is working with a set of cable news transcripts from several weeks
+in 2018. You should be able to download your data set from within the
+`project05a.Rmd` file.
+
+**Group 1**: `transcript_2018_1`
+
+**Group 2**: `transcript_2018_2`
+
+**Group 3**: `transcript_2018_3`
+
+**Group 4**: `transcript_2018_4`
+
+**Group 5**: `transcript_2018_5`
+
+**Group 6**: `transcript_2018_6`
+
+**Group 7**: `transcript_2018_7`
+
+**Group 8**: `transcript_2018_8`
+
+## Notes
+
+While working through the project, I typically find that many groups ask for
+help writing the same bits of code. Any notes that I want to share about how
+to do specific tasks will be added here as we work through the project.

@@ -498,10 +498,359 @@ summary {
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(forcats)</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggrepel)</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(smodels)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">theme_set</span>(<span class="fu">theme_minimal</span>())</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">dplyr.summarise.inform =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">width =</span> 77L)</span></code></pre></div>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(cleanNLP)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(topicmodels)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(magrittr)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">theme_set</span>(<span class="fu">theme_minimal</span>())</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">dplyr.summarise.inform =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">width =</span> 77L)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;wiki.R&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>pages <span class="ot">&lt;-</span> <span class="fu">wiki_get_pages</span>(<span class="fu">c</span>(<span class="st">&quot;Coffee&quot;</span>, <span class="st">&quot;Tea&quot;</span>), <span class="at">lang =</span> <span class="st">&quot;en&quot;</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>pages</span></code></pre></div>
+<pre><code>## # A tibble: 2 x 4
+##   page   lang  text                            links                         
+##   &lt;chr&gt;  &lt;chr&gt; &lt;chr&gt;                           &lt;chr&gt;                         
+## 1 Coffee en    &quot;&lt;div class=\&quot;mw-parser-output… Open_access 16th_century 21st…
+## 2 Tea    en    &quot;&lt;div class=\&quot;mw-parser-output… Agriculture_in_Georgia_(count…</code></pre>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>exp_pages <span class="ot">&lt;-</span> <span class="fu">wiki_expand_pages</span>(pages)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">select</span>(exp_pages, page, lang)</span></code></pre></div>
+<pre><code>## # A tibble: 1,131 x 2
+##    page              lang 
+##    &lt;chr&gt;             &lt;chr&gt;
+##  1 Coffee            en   
+##  2 Tea               en   
+##  3 16th_century      en   
+##  4 21st_century      en   
+##  5 AARP              en   
+##  6 Abdominal_surgery en   
+##  7 Acacia            en   
+##  8 Acid              en   
+##  9 Adal_Sultanate    en   
+## 10 Aden              en   
+## # … with 1,121 more rows</code></pre>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">wiki_get_pages_text</span>(exp_pages)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">select</span>(wiki, page, sec_num, section)</span></code></pre></div>
+<pre><code>## # A tibble: 41,326 x 3
+##    page   sec_num section     
+##    &lt;chr&gt;    &lt;dbl&gt; &lt;chr&gt;       
+##  1 Coffee       0 0. Lead     
+##  2 Coffee       0 0. Lead     
+##  3 Coffee       0 0. Lead     
+##  4 Coffee       0 0. Lead     
+##  5 Coffee       0 0. Lead     
+##  6 Coffee       1 1. Etymology
+##  7 Coffee       1 1. Etymology
+##  8 Coffee       2 2. History  
+##  9 Coffee       2 2. History  
+## 10 Coffee       2 2. History  
+## # … with 41,316 more rows</code></pre>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">tapply</span>(wiki<span class="sc">$</span>text, wiki<span class="sc">$</span>page, paste, <span class="at">collapse =</span> <span class="st">&quot; &quot;</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">tibble</span>(<span class="at">doc_id =</span> <span class="fu">names</span>(wiki), <span class="at">text =</span> <span class="fu">as.character</span>(wiki))</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea.csv&quot;</span>))</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>token <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea_token.csv.gz&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> token <span class="sc">%&gt;%</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(upos <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;NOUN&quot;</span>, <span class="st">&quot;ADJ&quot;</span>, <span class="st">&quot;ADV&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cnlp_utils_tf</span>(<span class="at">min_df =</span> <span class="fl">0.001</span>, <span class="at">max_df =</span> <span class="fl">0.5</span>, <span class="at">doc_set =</span> wiki<span class="sc">$</span>doc_id)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>topic_model <span class="ot">&lt;-</span> <span class="fu">sm_lda_topics</span>(X, <span class="at">num_topics =</span> <span class="dv">16</span>)</span></code></pre></div>
+<pre><code>## **** em iteration 1 ****
+## document 1131
+## new alpha = 3.08783
+## **** em iteration 2 ****
+## document 1131
+## new alpha = 1.16881
+## **** em iteration 3 ****
+## document 1131
+## new alpha = 0.42859
+## **** em iteration 4 ****
+## document 1131
+## new alpha = 0.21483
+## **** em iteration 5 ****
+## document 1131
+## new alpha = 0.13038
+## **** em iteration 6 ****
+## document 1131
+## new alpha = 0.09432
+## **** em iteration 7 ****
+## document 1131
+## new alpha = 0.07531
+## **** em iteration 8 ****
+## document 1131
+## new alpha = 0.06383
+## **** em iteration 9 ****
+## document 1131
+## new alpha = 0.05628
+## **** em iteration 10 ****
+## document 1131
+## new alpha = 0.05101
+## **** em iteration 11 ****
+## document 1131
+## new alpha = 0.04714
+## **** em iteration 12 ****
+## document 1131
+## new alpha = 0.04423
+## **** em iteration 13 ****
+## document 1131
+## new alpha = 0.04198
+## **** em iteration 14 ****
+## document 1131
+## new alpha = 0.04018
+## **** em iteration 15 ****
+## document 1131
+## new alpha = 0.03874
+## **** em iteration 16 ****
+## document 1131
+## new alpha = 0.03756
+## **** em iteration 17 ****
+## document 1131
+## new alpha = 0.03659
+## **** em iteration 18 ****
+## document 1131
+## new alpha = 0.03578
+## **** em iteration 19 ****
+## document 1131
+## new alpha = 0.03509
+## **** em iteration 20 ****
+## document 1131
+## new alpha = 0.03451
+## **** em iteration 21 ****
+## document 1131
+## new alpha = 0.03400
+## **** em iteration 22 ****
+## document 1131
+## new alpha = 0.03355
+## **** em iteration 23 ****
+## document 1131
+## new alpha = 0.03316
+## **** em iteration 24 ****
+## document 1131
+## new alpha = 0.03283
+## final e step document 1131</code></pre>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>topic_docs <span class="ot">&lt;-</span> topic_model<span class="sc">$</span>docs</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>topic_terms <span class="ot">&lt;-</span> topic_model<span class="sc">$</span>terms</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>topic_docs</span></code></pre></div>
+<pre><code>## # A tibble: 18,096 x 3
+##    doc_id             topic      prob
+##    &lt;chr&gt;              &lt;int&gt;     &lt;dbl&gt;
+##  1 16th_century           1 0.000224 
+##  2 21st_century           1 0.0623   
+##  3 AARP                   1 0.350    
+##  4 Abdominal_surgery      1 0.000184 
+##  5 Acacia                 1 0.0000773
+##  6 Acid                   1 0.0000186
+##  7 Adal_Sultanate         1 0.0000430
+##  8 Aden                   1 0.0000386
+##  9 Adenosine_receptor     1 0.0000798
+## 10 Affogato               1 0.000333 
+## # … with 18,086 more rows</code></pre>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>topic_docs <span class="sc">%&gt;%</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(topic, <span class="fu">desc</span>(prob)) <span class="sc">%&gt;%</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(topic) <span class="sc">%&gt;%</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(topic) <span class="sc">%&gt;%</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">doc_id =</span> <span class="fu">paste</span>(topic, doc_id, <span class="at">sep =</span> <span class="st">&quot; =&gt; &quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">use_series</span>(doc_id)</span></code></pre></div>
+<pre><code>##   [1] &quot;1 =&gt; Today_(American_TV_program)&quot;                                
+##   [2] &quot;1 =&gt; Exchange-traded_fund&quot;                                       
+##   [3] &quot;1 =&gt; Food_Network&quot;                                               
+##   [4] &quot;1 =&gt; London_International_Financial_Futures_and_Options_Exchange&quot;
+##   [5] &quot;1 =&gt; Futures_contract&quot;                                           
+##   [6] &quot;1 =&gt; BBC_News&quot;                                                   
+##   [7] &quot;1 =&gt; The_Irish_Times&quot;                                            
+##   [8] &quot;1 =&gt; Asia_Today&quot;                                                 
+##   [9] &quot;1 =&gt; Intercontinental_Exchange&quot;                                  
+##  [10] &quot;1 =&gt; Australian_Broadcasting_Corporation&quot;                        
+##  [11] &quot;2 =&gt; English_language&quot;                                           
+##  [12] &quot;2 =&gt; Dutch_language&quot;                                             
+##  [13] &quot;2 =&gt; German_language&quot;                                            
+##  [14] &quot;2 =&gt; Spanish_language&quot;                                           
+##  [15] &quot;2 =&gt; Turkish_language&quot;                                           
+##  [16] &quot;2 =&gt; Polish_language&quot;                                            
+##  [17] &quot;2 =&gt; Hindi&quot;                                                      
+##  [18] &quot;2 =&gt; Northern_Thai_language&quot;                                     
+##  [19] &quot;2 =&gt; Teochew_dialect&quot;                                            
+##  [20] &quot;2 =&gt; Ottoman_Turkish&quot;                                            
+##  [21] &quot;3 =&gt; List_of_coffee_drinks&quot;                                      
+##  [22] &quot;3 =&gt; Coffee_preparation&quot;                                         
+##  [23] &quot;3 =&gt; Iced_tea&quot;                                                   
+##  [24] &quot;3 =&gt; Iced_coffee&quot;                                                
+##  [25] &quot;3 =&gt; Espresso_machine&quot;                                           
+##  [26] &quot;3 =&gt; Hong_Kong-style_milk_tea&quot;                                   
+##  [27] &quot;3 =&gt; Vacuum_coffee_maker&quot;                                        
+##  [28] &quot;3 =&gt; Frappé_coffee&quot;                                              
+##  [29] &quot;3 =&gt; Brewed_coffee&quot;                                              
+##  [30] &quot;3 =&gt; Caffè_Americano&quot;                                            
+##  [31] &quot;4 =&gt; Lepidoptera&quot;                                                
+##  [32] &quot;4 =&gt; Vegetative_reproduction&quot;                                    
+##  [33] &quot;4 =&gt; Gynoecium&quot;                                                  
+##  [34] &quot;4 =&gt; Evergreen&quot;                                                  
+##  [35] &quot;4 =&gt; Shrub&quot;                                                      
+##  [36] &quot;4 =&gt; Stipule&quot;                                                    
+##  [37] &quot;4 =&gt; Petiole_(botany)&quot;                                           
+##  [38] &quot;4 =&gt; Casuarina&quot;                                                  
+##  [39] &quot;4 =&gt; Berry_(botany)&quot;                                             
+##  [40] &quot;4 =&gt; Fruit&quot;                                                      
+##  [41] &quot;5 =&gt; Hobart&quot;                                                     
+##  [42] &quot;5 =&gt; North_Beach,_San_Francisco&quot;                                 
+##  [43] &quot;5 =&gt; Oxford&quot;                                                     
+##  [44] &quot;5 =&gt; Milan&quot;                                                      
+##  [45] &quot;5 =&gt; Leipzig&quot;                                                    
+##  [46] &quot;5 =&gt; Paris&quot;                                                      
+##  [47] &quot;5 =&gt; Seoul&quot;                                                      
+##  [48] &quot;5 =&gt; Melbourne&quot;                                                  
+##  [49] &quot;5 =&gt; Kingston_upon_Hull&quot;                                         
+##  [50] &quot;5 =&gt; The_Hague&quot;                                                  
+##  [51] &quot;6 =&gt; Metabolism&quot;                                                 
+##  [52] &quot;6 =&gt; Protein&quot;                                                    
+##  [53] &quot;6 =&gt; Acid&quot;                                                       
+##  [54] &quot;6 =&gt; Redox&quot;                                                      
+##  [55] &quot;6 =&gt; Fermentation&quot;                                               
+##  [56] &quot;6 =&gt; Monosaccharide&quot;                                             
+##  [57] &quot;6 =&gt; Caramelization&quot;                                             
+##  [58] &quot;6 =&gt; Mouthfeel&quot;                                                  
+##  [59] &quot;6 =&gt; Food_browning&quot;                                              
+##  [60] &quot;6 =&gt; Desiccant&quot;                                                  
+##  [61] &quot;7 =&gt; Oceanic_climate&quot;                                            
+##  [62] &quot;7 =&gt; Indian_subcontinent&quot;                                        
+##  [63] &quot;7 =&gt; Tropic_of_Cancer&quot;                                           
+##  [64] &quot;7 =&gt; Boma_Plateau&quot;                                               
+##  [65] &quot;7 =&gt; Northeast_India&quot;                                            
+##  [66] &quot;7 =&gt; Southwest_China&quot;                                            
+##  [67] &quot;7 =&gt; Indonesia&quot;                                                  
+##  [68] &quot;7 =&gt; Ethiopian_Highlands&quot;                                        
+##  [69] &quot;7 =&gt; Subtropics&quot;                                                 
+##  [70] &quot;7 =&gt; Java&quot;                                                       
+##  [71] &quot;8 =&gt; Manchu_people&quot;                                              
+##  [72] &quot;8 =&gt; Yuan_dynasty&quot;                                               
+##  [73] &quot;8 =&gt; Tang_dynasty&quot;                                               
+##  [74] &quot;8 =&gt; Northern_and_Southern_dynasties&quot;                            
+##  [75] &quot;8 =&gt; Zhongyuan&quot;                                                  
+##  [76] &quot;8 =&gt; Shennong&quot;                                                   
+##  [77] &quot;8 =&gt; Song_dynasty&quot;                                               
+##  [78] &quot;8 =&gt; Ba_(state)&quot;                                                 
+##  [79] &quot;8 =&gt; Wang_Bao&quot;                                                   
+##  [80] &quot;8 =&gt; Chronicles_of_Huayang&quot;                                      
+##  [81] &quot;9 =&gt; Sufism&quot;                                                     
+##  [82] &quot;9 =&gt; Ibn_Hajar_al-Haytami&quot;                                       
+##  [83] &quot;9 =&gt; Buddhism&quot;                                                   
+##  [84] &quot;9 =&gt; Haram&quot;                                                      
+##  [85] &quot;9 =&gt; Mormons&quot;                                                    
+##  [86] &quot;9 =&gt; Apocrypha&quot;                                                  
+##  [87] &quot;9 =&gt; Zen&quot;                                                        
+##  [88] &quot;9 =&gt; Joseph_Smith&quot;                                               
+##  [89] &quot;9 =&gt; Seventh-day_Adventist_Church&quot;                               
+##  [90] &quot;9 =&gt; Passover&quot;                                                   
+##  [91] &quot;10 =&gt; Russian_Empire&quot;                                            
+##  [92] &quot;10 =&gt; Prussia&quot;                                                   
+##  [93] &quot;10 =&gt; Cossacks&quot;                                                  
+##  [94] &quot;10 =&gt; Portuguese_Macau&quot;                                          
+##  [95] &quot;10 =&gt; Federal_government_of_Brazil&quot;                              
+##  [96] &quot;10 =&gt; Turkish_Statistical_Institute&quot;                             
+##  [97] &quot;10 =&gt; Oromo_people&quot;                                              
+##  [98] &quot;10 =&gt; Ottoman_Empire&quot;                                            
+##  [99] &quot;10 =&gt; Yemen&quot;                                                     
+## [100] &quot;10 =&gt; Immigration_to_Brazil&quot;                                     
+## [101] &quot;11 =&gt; Stroke&quot;                                                    
+## [102] &quot;11 =&gt; Parkinson&#39;s_disease&quot;                                       
+## [103] &quot;11 =&gt; Heart_failure&quot;                                             
+## [104] &quot;11 =&gt; Myocardial_infarction&quot;                                     
+## [105] &quot;11 =&gt; Hypertension&quot;                                              
+## [106] &quot;11 =&gt; Cardiovascular_disease&quot;                                    
+## [107] &quot;11 =&gt; Coronary_artery_disease&quot;                                   
+## [108] &quot;11 =&gt; Small_for_gestational_age&quot;                                 
+## [109] &quot;11 =&gt; Cognitive_deficit&quot;                                         
+## [110] &quot;11 =&gt; Lung_cancer&quot;                                               
+## [111] &quot;12 =&gt; PubMed_Central&quot;                                            
+## [112] &quot;12 =&gt; Library_of_Congress_Control_Number&quot;                        
+## [113] &quot;12 =&gt; Bibcode&quot;                                                   
+## [114] &quot;12 =&gt; Semantic_Scholar&quot;                                          
+## [115] &quot;12 =&gt; International_Standard_Serial_Number&quot;                      
+## [116] &quot;12 =&gt; International_Standard_Book_Number&quot;                        
+## [117] &quot;12 =&gt; Digital_object_identifier&quot;                                 
+## [118] &quot;12 =&gt; Open_access&quot;                                               
+## [119] &quot;12 =&gt; Systematic_review&quot;                                         
+## [120] &quot;12 =&gt; Dictionary_of_National_Biography&quot;                          
+## [121] &quot;13 =&gt; Fresh_water&quot;                                               
+## [122] &quot;13 =&gt; Environmental_degradation&quot;                                 
+## [123] &quot;13 =&gt; Climate_change&quot;                                            
+## [124] &quot;13 =&gt; Bar_(unit)&quot;                                                
+## [125] &quot;13 =&gt; Paraxanthine&quot;                                              
+## [126] &quot;13 =&gt; Ice_age&quot;                                                   
+## [127] &quot;13 =&gt; Gallon&quot;                                                    
+## [128] &quot;13 =&gt; Gastrointestinal_tract&quot;                                    
+## [129] &quot;13 =&gt; Elephant&quot;                                                  
+## [130] &quot;13 =&gt; Theobromine&quot;                                               
+## [131] &quot;14 =&gt; War_of_1812&quot;                                               
+## [132] &quot;14 =&gt; American_Revolutionary_War&quot;                                
+## [133] &quot;14 =&gt; Saratoga_campaign&quot;                                         
+## [134] &quot;14 =&gt; John_Burgoyne&quot;                                             
+## [135] &quot;14 =&gt; Second_Opium_War&quot;                                          
+## [136] &quot;14 =&gt; Opium_Wars&quot;                                                
+## [137] &quot;14 =&gt; First_Opium_War&quot;                                           
+## [138] &quot;14 =&gt; Battle_of_Vienna&quot;                                          
+## [139] &quot;14 =&gt; East_India_Company&quot;                                        
+## [140] &quot;14 =&gt; Friedrich_Adolf_Riedesel&quot;                                  
+## [141] &quot;15 =&gt; Developed_country&quot;                                         
+## [142] &quot;15 =&gt; Child_labour&quot;                                              
+## [143] &quot;15 =&gt; Living_wage&quot;                                               
+## [144] &quot;15 =&gt; United_States_Department_of_Labor&quot;                         
+## [145] &quot;15 =&gt; United_Nations_Conference_on_Trade_and_Development&quot;        
+## [146] &quot;15 =&gt; List_of_international_rankings&quot;                            
+## [147] &quot;15 =&gt; Rail_transport&quot;                                            
+## [148] &quot;15 =&gt; List_of_Goods_Produced_by_Child_Labor_or_Forced_Labor&quot;     
+## [149] &quot;15 =&gt; National_Health_Service&quot;                                   
+## [150] &quot;15 =&gt; Business&quot;                                                  
+## [151] &quot;16 =&gt; Coffee_production_in_Uganda&quot;                               
+## [152] &quot;16 =&gt; Coffee_production_in_Mexico&quot;                               
+## [153] &quot;16 =&gt; Coffee_production_in_the_Philippines&quot;                      
+## [154] &quot;16 =&gt; Coffee_production_in_Cameroon&quot;                             
+## [155] &quot;16 =&gt; Coffee_production_in_Guadeloupe&quot;                           
+## [156] &quot;16 =&gt; Coffee_production_in_Nicaragua&quot;                            
+## [157] &quot;16 =&gt; Coffee_production_in_Kenya&quot;                                
+## [158] &quot;16 =&gt; Coffee_production_in_Ecuador&quot;                              
+## [159] &quot;16 =&gt; Single-origin_coffee&quot;                                      
+## [160] &quot;16 =&gt; Coffee_production_in_Panama&quot;</code></pre>
+<div class="sourceCode" id="cb18"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>topic_terms</span></code></pre></div>
+<pre><code>## # A tibble: 160,000 x 3
+##    token topic  beta
+##    &lt;chr&gt; &lt;int&gt; &lt;dbl&gt;
+##  1 use       1 -6.52
+##  2 use       2 -5.20
+##  3 use       3 -6.09
+##  4 use       4 -5.74
+##  5 use       5 -7.55
+##  6 use       6 -5.85
+##  7 use       7 -7.60
+##  8 use       8 -5.86
+##  9 use       9 -6.10
+## 10 use      10 -7.70
+## # … with 159,990 more rows</code></pre>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>topic_terms <span class="sc">%&gt;%</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(topic, <span class="fu">desc</span>(beta)) <span class="sc">%&gt;%</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(topic) <span class="sc">%&gt;%</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(topic) <span class="sc">%&gt;%</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="fu">sm_paste</span>(token))</span></code></pre></div>
+<pre><code>## # A tibble: 16 x 2
+##    topic token_paste                                                         
+##    &lt;int&gt; &lt;chr&gt;                                                               
+##  1     1 company; news; newspaper; market; paper; new; future; %; program; c…
+##  2     2 language; word; dialect; form; variety; speaker; example; standard;…
+##  3     3 tea; coffee; water; milk; drink; leave; green; cup; espresso; hot   
+##  4     4 plant; specie; fruit; rice; food; seed; crop; beetle; pesticide; so…
+##  5     5 city; area; %; major; population; river; world; new; centre; home   
+##  6     6 acid; sugar; milk; food; protein; wine; enzyme; product; process; r…
+##  7     7 %; region; world; population; area; language; state; people; island…
+##  8     8 chinese; dynasty; period; people; character; official; emperor; cul…
+##  9     9 church; practice; religious; islamic; school; tradition; man; jewis…
+## 10    10 government; state; military; population; people; power; political; …
+## 11    11 disease; cancer; risk; blood; %; people; heart; symptom; study; tre…
+## 12    12 work; book; article; study; research; access; parser; output; journ…
+## 13    13 water; caffeine; effect; anxiety; tobacco; elephant; use; %; human;…
+## 14    14 british; war; american; ship; trade; force; army; french; colony; m…
+## 15    15 child; %; member; service; health; government; system; world; publi…
+## 16    16 coffee; production; bean; %; trade; producer; farmer; world; price;…</code></pre>
 
 
 

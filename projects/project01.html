@@ -403,10 +403,48 @@ summary {
 </div>
 
 
-<p><strong>Due Date</strong>: 02 February 2021</p>
-<p>This page outlines the instructions for the first project. You should have a file <code>project01.Rmd</code> in your RStudio workspace where you can work on the project.</p>
-<div id="instructions" class="section level2">
-<h2>Instructions</h2>
+<p><strong>Due Date</strong>: 25 February 2021</p>
+<div id="general-instructions" class="section level2">
+<h2>General Instructions</h2>
+<p>This page outlines the instructions for the first project. You should have a file <code>project01.Rmd</code> in your RStudio workspace where you can work on the project. I find that students prefer having a consistent format for the projects, so I will attempt to keep the format the same throughout the semester.</p>
+<p>On the due-date, your group is responsible for completing three elements:</p>
+<ol style="list-style-type: decimal">
+<li>A short (about one-page single spaced) description of your work answering a subset of the questions below. Please submit as a Google Doc in your shared group Google Drive folder.</li>
+<li>A Google Slides presentation of your results, also submitted in your shared drive folder.</li>
+<li>Giving a presentation based on your slide show. This should be 8-10 minutes in length. I suggest having one member drive the slides and the others rotate describing the results.</li>
+</ol>
+<p>As described on the syllabus, the project will be graded as either Satisfactory or Unsatisfactory. I will provide additional feedback that you can address in the next project.</p>
+</div>
+<div id="specific-instructions" class="section level2">
+<h2>Specific Instructions</h2>
+<p>This project uses a collection of movies reviews from IMDb. This is a classic data set in machine learning. You can read more about the collection as a whole <a href="http://ai.stanford.edu/%7Eamaas/data/sentiment/">here</a>. Each group will be assigned a slightly different subset of the corpus to explore; each subset considers the differences (or lack thereof) between different subsets of the corpus.</p>
+<p>The goal of your project is to apply the methods we have developed so far to explore your corpus and understand what features distinguish the two categories you have been assigned. Here are some things you should consider addressing:</p>
+<ul>
+<li>How accurately can you classify the two groups based on the text on the validation data?</li>
+<li>What terms most distinguish the groups? Are there any bigrams or skip grams that are particularly important? If you look at just verbs or adjectives does anything different pop up?</li>
+<li>Looking at negative example from your best model, do you find it easy to identify the correct class or not?</li>
+<li>If any of the most indicative terms seem surprising, apply KWiC to the data. Does that help explain why the term is predictive?</li>
+<li>Is there a difference in the parts of speech used between the groups?</li>
+<li>Create a confusion matrix and describe any patterns (interesting or not).</li>
+</ul>
+<p>I recommend looking into most of these, but feel free to skip parts that seem less relevant to your question. Likewise, consider extending the questions if an interesting idea comes from your analysis.</p>
+<p>You will find that most (perhaps all) of the results you want to show are tables and example reviews. Getting these into a slide show can be a bit annoying. Some approaches include: (1) highlight and copy texts from the clipboard, (2) screen shots of small tables or (3) save the table as a csv file, read into Excel or Googe Sheets, and paste as a table from there.</p>
+</div>
+<div id="groups" class="section level2">
+<h2>Groups</h2>
+<p>Each group has a slightly different part of the corpus and a different prediction task. The full corpus contains reviews with 1-4 or 7-10 stars. You should be able to download your data set from within the <code>project01.Rmd</code> file.</p>
+<p><strong>Group 1</strong>: <code>imdb_neg_extreme</code> Compare reviews of 1 star to those with 4.</p>
+<p><strong>Group 2</strong>: <code>imdb_pos_extreme</code> Compare reviews of 7 stars to those with 10.</p>
+<p><strong>Group 3</strong>: <code>imdb_polarity_extreme</code> Compare the 1 and 10 star reviews.</p>
+<p><strong>Group 4</strong>: <code>imdb_polarity_mod</code> Compare the 4 and 7 star reviews.</p>
+<p><strong>Group 5</strong>: <code>imdb_vs_extreme</code> Compare the extreme (1/10) reviews to the moderate (4/7) ones.</p>
+<p><strong>Group 6</strong>: <code>imdb_cats_neg</code> Do a multiclass comparison of the 4 different negative scores.</p>
+<p><strong>Group 7</strong>: <code>imdb_cats_pos</code> Do a multiclass comparison of the 4 different positive scores.</p>
+<p><strong>Group 8</strong>: <code>imdb_cats_all</code> Do a multiclass comparison of all 8 categories.</p>
+</div>
+<div id="notes" class="section level2">
+<h2>Notes</h2>
+<p>While working through the project, I typically find that many groups ask for help writing the same bits of code. Any notes that I want to share about how to do specific tasks will be added here as we work through the project.</p>
 </div>
 
 

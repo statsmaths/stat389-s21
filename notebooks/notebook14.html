@@ -11,7 +11,7 @@
 
 
 
-<title>Notebook 14: Language Detection</title>
+<title>Notebook 14: Named Entity Recognition</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -489,7 +489,7 @@ summary {
 
 
 
-<h1 class="title toc-ignore">Notebook 14: Language Detection</h1>
+<h1 class="title toc-ignore">Notebook 14: Named Entity Recognition</h1>
 
 </div>
 
@@ -498,10 +498,378 @@ summary {
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(forcats)</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggrepel)</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(smodels)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">theme_set</span>(<span class="fu">theme_minimal</span>())</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">dplyr.summarise.inform =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">width =</span> 77L)</span></code></pre></div>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(cleanNLP)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(magrittr)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">theme_set</span>(<span class="fu">theme_minimal</span>())</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">dplyr.summarise.inform =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">width =</span> 77L)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea.csv&quot;</span>))</span></code></pre></div>
+<pre><code>## 
+## ── Column specification ────────────────────────────────────────────────────────
+## cols(
+##   doc_id = col_character(),
+##   text = col_character()
+## )</code></pre>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>anno <span class="ot">&lt;-</span> <span class="fu">cnlp_annotate</span>(wiki)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>token <span class="ot">&lt;-</span> anno<span class="sc">$</span>token</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>ner <span class="ot">&lt;-</span> anno<span class="sc">$</span>entity</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>ner</span></code></pre></div>
+<pre><code>## # A tibble: 368,911 x 6
+##    doc_id       sid   tid tid_end entity_type entity                         
+##    &lt;chr&gt;      &lt;dbl&gt; &lt;dbl&gt;   &lt;dbl&gt; &lt;chr&gt;       &lt;chr&gt;                          
+##  1 16th_cent…     1     1       3 DATE        The 16th century               
+##  2 16th_cent…     1     6       9 DATE        the Julian year 1501           
+##  3 16th_cent…     1    15      15 NORP        Julian                         
+##  4 16th_cent…     1    17      20 DATE        the Gregorian year 1600        
+##  5 16th_cent…     1    35      36 DATE        10 days                        
+##  6 16th_cent…     1    38      39 DATE        October 1582                   
+##  7 16th_cent…     2     9      10 DATE        the 1500s                      
+##  8 16th_cent…     2    12      13 DATE        the century                    
+##  9 16th_cent…     2    14      23 DATE        between January 1, 1500 and De…
+## 10 16th_cent…     3     1       3 DATE        The 16th century               
+## # … with 368,901 more rows</code></pre>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>ner <span class="sc">%&gt;%</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(entity_type) <span class="sc">%&gt;%</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="fu">sm_count</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(count))</span></code></pre></div>
+<pre><code>## # A tibble: 18 x 2
+##    entity_type count
+##    &lt;chr&gt;       &lt;int&gt;
+##  1 GPE         72967
+##  2 ORG         54916
+##  3 PERSON      52096
+##  4 DATE        50998
+##  5 NORP        46130
+##  6 CARDINAL    33397
+##  7 LOC         15171
+##  8 ORDINAL      8329
+##  9 PERCENT      7749
+## 10 FAC          4445
+## 11 WORK_OF_ART  4401
+## 12 QUANTITY     3840
+## 13 EVENT        3674
+## 14 LANGUAGE     2950
+## 15 MONEY        2600
+## 16 PRODUCT      2335
+## 17 TIME         1655
+## 18 LAW          1258</code></pre>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>ner <span class="sc">%&gt;%</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(entity_type <span class="sc">==</span> <span class="st">&quot;GPE&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(doc_id, entity) <span class="sc">%&gt;%</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="fu">sm_count</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(doc_id, <span class="fu">desc</span>(count)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(count <span class="sc">&gt;</span> <span class="dv">20</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">lab =</span> <span class="fu">paste</span>(doc_id, entity, <span class="at">sep =</span> <span class="st">&quot; =&gt; &quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">use_series</span>(lab)</span></code></pre></div>
+<pre><code>##   [1] &quot;Aden =&gt; Aden&quot;                                        
+##   [2] &quot;Age_of_Enlightenment =&gt; France&quot;                      
+##   [3] &quot;Agriculture_in_Georgia_(country) =&gt; Georgia&quot;         
+##   [4] &quot;Aleppo =&gt; Aleppo&quot;                                    
+##   [5] &quot;American_Revolution =&gt; Britain&quot;                      
+##   [6] &quot;American_Revolutionary_War =&gt; Washington&quot;            
+##   [7] &quot;Arabian_Peninsula =&gt; Yemen&quot;                          
+##   [8] &quot;Armenians =&gt; Armenia&quot;                                
+##   [9] &quot;Assam =&gt; India&quot;                                      
+##  [10] &quot;Azores =&gt; Portugal&quot;                                  
+##  [11] &quot;Balliol_College,_Oxford =&gt; Balliol&quot;                  
+##  [12] &quot;Balochistan,_Pakistan =&gt; Balochistan&quot;                
+##  [13] &quot;Bamako =&gt; Bamako&quot;                                    
+##  [14] &quot;Battle_of_Vienna =&gt; Vienna&quot;                          
+##  [15] &quot;Bavaria =&gt; Bavaria&quot;                                  
+##  [16] &quot;BBC =&gt; UK&quot;                                           
+##  [17] &quot;Belgium =&gt; Belgium&quot;                                  
+##  [18] &quot;Berbera =&gt; Berbera&quot;                                  
+##  [19] &quot;Bosnia_and_Herzegovina =&gt; Bosnia and Herzegovina&quot;    
+##  [20] &quot;Boston =&gt; Boston&quot;                                    
+##  [21] &quot;Brazil =&gt; Brazil&quot;                                    
+##  [22] &quot;Buddhism =&gt; India&quot;                                   
+##  [23] &quot;Cairo =&gt; Cairo&quot;                                      
+##  [24] &quot;Canada =&gt; Canada&quot;                                    
+##  [25] &quot;Cantonese =&gt; Hong Kong&quot;                              
+##  [26] &quot;Central_Africa =&gt; Central Africa&quot;                    
+##  [27] &quot;Cha_chaan_teng =&gt; Hong Kong&quot;                         
+##  [28] &quot;Charles_II_of_England =&gt; England&quot;                    
+##  [29] &quot;Chengdu =&gt; Chengdu&quot;                                  
+##  [30] &quot;China =&gt; China&quot;                                      
+##  [31] &quot;Chinese_characters =&gt; China&quot;                         
+##  [32] &quot;Chinese_tea =&gt; China&quot;                                
+##  [33] &quot;Coffee_production_in_Brazil =&gt; Brazil&quot;               
+##  [34] &quot;Coffee_production_in_India =&gt; India&quot;                 
+##  [35] &quot;Coffee_production_in_Indonesia =&gt; Indonesia&quot;         
+##  [36] &quot;Coffee_production_in_Uganda =&gt; Uganda&quot;               
+##  [37] &quot;Coffee_production_in_Vietnam =&gt; Vietnam&quot;             
+##  [38] &quot;Colombia =&gt; Colombia&quot;                                
+##  [39] &quot;Commonwealth_of_Nations =&gt; Britain&quot;                  
+##  [40] &quot;Congo_River =&gt; Congo&quot;                                
+##  [41] &quot;Cornwall =&gt; Cornwall&quot;                                
+##  [42] &quot;Cossacks =&gt; Cossack&quot;                                 
+##  [43] &quot;Costa_Rica =&gt; Costa Rica&quot;                            
+##  [44] &quot;Cotton =&gt; India&quot;                                     
+##  [45] &quot;Crete =&gt; Greece&quot;                                     
+##  [46] &quot;Culture_of_Pakistan =&gt; Pakistan&quot;                     
+##  [47] &quot;Damascus =&gt; Damascus&quot;                                
+##  [48] &quot;Denmark =&gt; Denmark&quot;                                  
+##  [49] &quot;Dutch_language =&gt; Netherlands&quot;                       
+##  [50] &quot;East_Africa =&gt; East Africa&quot;                          
+##  [51] &quot;East_Asia =&gt; Japan&quot;                                  
+##  [52] &quot;East_India_Company =&gt; India&quot;                         
+##  [53] &quot;Egypt =&gt; Egypt&quot;                                      
+##  [54] &quot;English_people =&gt; England&quot;                           
+##  [55] &quot;Ethiopia =&gt; Ethiopia&quot;                                
+##  [56] &quot;Europe =&gt; Germany&quot;                                   
+##  [57] &quot;Finland =&gt; Finland&quot;                                  
+##  [58] &quot;First_Opium_War =&gt; China&quot;                            
+##  [59] &quot;France =&gt; France&quot;                                    
+##  [60] &quot;Fujian =&gt; Fujian&quot;                                    
+##  [61] &quot;Gallon =&gt; US&quot;                                        
+##  [62] &quot;George_Washington_(inventor) =&gt; Washington&quot;          
+##  [63] &quot;Gilgit-Baltistan =&gt; Pakistan&quot;                        
+##  [64] &quot;Greece =&gt; Greece&quot;                                    
+##  [65] &quot;Guinea =&gt; Guinea&quot;                                    
+##  [66] &quot;Haiti =&gt; Haiti&quot;                                      
+##  [67] &quot;Haitian_Revolution =&gt; Haiti&quot;                         
+##  [68] &quot;Han_Chinese =&gt; China&quot;                                
+##  [69] &quot;Hindi =&gt; Hindi&quot;                                      
+##  [70] &quot;History_of_China =&gt; China&quot;                           
+##  [71] &quot;History_of_tea =&gt; China&quot;                             
+##  [72] &quot;History_of_tea_in_Japan =&gt; Japan&quot;                    
+##  [73] &quot;Hokkien =&gt; Hokkien&quot;                                  
+##  [74] &quot;Honduras =&gt; Honduras&quot;                                
+##  [75] &quot;Hong_Kong-style_milk_tea =&gt; Hong Kong&quot;               
+##  [76] &quot;Iceland =&gt; Iceland&quot;                                  
+##  [77] &quot;Immigration_to_Brazil =&gt; Brazil&quot;                     
+##  [78] &quot;India =&gt; India&quot;                                      
+##  [79] &quot;Indian_tea_culture =&gt; India&quot;                         
+##  [80] &quot;Indonesia =&gt; Indonesia&quot;                              
+##  [81] &quot;Iran =&gt; Iran&quot;                                        
+##  [82] &quot;Italy =&gt; Italy&quot;                                      
+##  [83] &quot;Japanese_language =&gt; Japan&quot;                          
+##  [84] &quot;Jesuit_China_missions =&gt; China&quot;                      
+##  [85] &quot;Jews =&gt; Israel&quot;                                      
+##  [86] &quot;Johann_Sebastian_Bach =&gt; Leipzig&quot;                    
+##  [87] &quot;John_Adams =&gt; France&quot;                                
+##  [88] &quot;Joseph_Smith =&gt; Missouri&quot;                            
+##  [89] &quot;Kangxi_Emperor =&gt; China&quot;                             
+##  [90] &quot;Kenya =&gt; Kenya&quot;                                      
+##  [91] &quot;Khyber_Pakhtunkhwa =&gt; Pakistan&quot;                      
+##  [92] &quot;Kopi_(drink) =&gt; Singapore&quot;                           
+##  [93] &quot;Korean_language =&gt; South Korea&quot;                      
+##  [94] &quot;Latin_America =&gt; Brazil&quot;                             
+##  [95] &quot;Leipzig =&gt; Leipzig&quot;                                  
+##  [96] &quot;Luxembourg =&gt; Luxembourg&quot;                            
+##  [97] &quot;Macau =&gt; Macau&quot;                                      
+##  [98] &quot;Maize =&gt; the United States&quot;                          
+##  [99] &quot;Manchu_people =&gt; Manchu&quot;                             
+## [100] &quot;Martinique =&gt; Martinique&quot;                            
+## [101] &quot;Mecca =&gt; Mecca&quot;                                      
+## [102] &quot;Melbourne =&gt; Melbourne&quot;                              
+## [103] &quot;Milan =&gt; Milan&quot;                                      
+## [104] &quot;Ming_dynasty =&gt; China&quot;                               
+## [105] &quot;Mongolia =&gt; Mongolia&quot;                                
+## [106] &quot;Myanmar =&gt; Myanmar&quot;                                  
+## [107] &quot;National_Health_Service =&gt; UK&quot;                       
+## [108] &quot;Near_East =&gt; the Ottoman Empire&quot;                     
+## [109] &quot;Nepali_tea =&gt; Nepal&quot;                                 
+## [110] &quot;Nestlé =&gt; Nestlé&quot;                                    
+## [111] &quot;Netherlands =&gt; Netherlands&quot;                          
+## [112] &quot;New_Amsterdam =&gt; New Amsterdam&quot;                      
+## [113] &quot;Nicaragua =&gt; Nicaragua&quot;                              
+## [114] &quot;Nordic_countries =&gt; Sweden&quot;                          
+## [115] &quot;North_Africa =&gt; North Africa&quot;                        
+## [116] &quot;Northeast_India =&gt; India&quot;                            
+## [117] &quot;Northern_and_Southern_dynasties =&gt; China&quot;            
+## [118] &quot;Norway =&gt; Norway&quot;                                    
+## [119] &quot;Oromo_people =&gt; Ethiopia&quot;                            
+## [120] &quot;Ottoman_Empire =&gt; the Ottoman Empire&quot;                
+## [121] &quot;Oxford =&gt; London&quot;                                    
+## [122] &quot;Oxford_University_Press =&gt; London&quot;                   
+## [123] &quot;Pakistan =&gt; Pakistan&quot;                                
+## [124] &quot;Paris =&gt; Paris&quot;                                      
+## [125] &quot;Pashtuns =&gt; Afghanistan&quot;                             
+## [126] &quot;Paul_Revere =&gt; Boston&quot;                               
+## [127] &quot;Peru =&gt; Peru&quot;                                        
+## [128] &quot;Pike_Place_Market =&gt; Seattle&quot;                        
+## [129] &quot;Portuguese_Macau =&gt; Macau&quot;                           
+## [130] &quot;Presidencies_and_provinces_of_British_India =&gt; India&quot;
+## [131] &quot;Prussia =&gt; Germany&quot;                                  
+## [132] &quot;Republic_of_Venice =&gt; Venice&quot;                        
+## [133] &quot;Rice =&gt; India&quot;                                       
+## [134] &quot;Rio_de_Janeiro_(state) =&gt; Rio de Janeiro&quot;            
+## [135] &quot;River_Thames =&gt; London&quot;                              
+## [136] &quot;Russia =&gt; Russia&quot;                                    
+## [137] &quot;Russian_Empire =&gt; Russia&quot;                            
+## [138] &quot;Samuel_Pepys =&gt; London&quot;                              
+## [139] &quot;São_Paulo =&gt; São Paulo&quot;                              
+## [140] &quot;Seattle =&gt; Seattle&quot;                                  
+## [141] &quot;Seoul =&gt; Seoul&quot;                                      
+## [142] &quot;Sichuan =&gt; Sichuan&quot;                                  
+## [143] &quot;Silk_Road =&gt; China&quot;                                  
+## [144] &quot;Soho =&gt; London&quot;                                      
+## [145] &quot;Song_dynasty =&gt; China&quot;                               
+## [146] &quot;Southeast_Asia =&gt; Indonesia&quot;                         
+## [147] &quot;Sri_Lanka =&gt; Sri Lanka&quot;                              
+## [148] &quot;Sweden =&gt; Sweden&quot;                                    
+## [149] &quot;Switzerland =&gt; Switzerland&quot;                          
+## [150] &quot;Taiwan =&gt; Taiwan&quot;                                    
+## [151] &quot;Tang_dynasty =&gt; China&quot;                               
+## [152] &quot;Tea =&gt; China&quot;                                        
+## [153] &quot;Tea_production_in_Sri_Lanka =&gt; Sri Lanka&quot;            
+## [154] &quot;Thailand =&gt; Thailand&quot;                                
+## [155] &quot;The_Hague =&gt; The Hague&quot;                              
+## [156] &quot;Tibet =&gt; Tibet&quot;                                      
+## [157] &quot;Turkey =&gt; Turkey&quot;                                    
+## [158] &quot;Turkish_cuisine =&gt; Turkey&quot;                           
+## [159] &quot;Uganda =&gt; Uganda&quot;                                    
+## [160] &quot;United_Kingdom =&gt; UK&quot;                                
+## [161] &quot;Urdu =&gt; India&quot;                                       
+## [162] &quot;Vancouver_Island =&gt; Vancouver Island&quot;                
+## [163] &quot;Varieties_of_Chinese =&gt; China&quot;                       
+## [164] &quot;Venice =&gt; Venice&quot;                                    
+## [165] &quot;Vienna =&gt; Vienna&quot;                                    
+## [166] &quot;Vietnam =&gt; Vietnam&quot;                                  
+## [167] &quot;War_of_1812 =&gt; the United States&quot;                    
+## [168] &quot;Washington_(state) =&gt; Washington&quot;                    
+## [169] &quot;Xi&#39;an =&gt; Xi&#39;an&quot;                                      
+## [170] &quot;Yemen =&gt; Yemen&quot;                                      
+## [171] &quot;Yuan_dynasty =&gt; China&quot;                               
+## [172] &quot;Yunnan =&gt; Yunnan&quot;                                    
+## [173] &quot;Zeila =&gt; Zeila&quot;</code></pre>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>ner <span class="sc">%&gt;%</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(entity_type <span class="sc">==</span> <span class="st">&quot;LANGUAGE&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(doc_id, entity) <span class="sc">%&gt;%</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="fu">sm_count</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(doc_id, <span class="fu">desc</span>(count)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(count <span class="sc">&gt;</span> <span class="dv">4</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">lab =</span> <span class="fu">paste</span>(doc_id, entity, <span class="at">sep =</span> <span class="st">&quot; =&gt; &quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">use_series</span>(lab)</span></code></pre></div>
+<pre><code>##  [1] &quot;Age_of_Enlightenment =&gt; English&quot;     
+##  [2] &quot;Alan_Macfarlane =&gt; English&quot;          
+##  [3] &quot;Arabic =&gt; Arabic&quot;                    
+##  [4] &quot;Arabs =&gt; Arabic&quot;                     
+##  [5] &quot;BBC =&gt; English&quot;                      
+##  [6] &quot;Beige =&gt; English&quot;                    
+##  [7] &quot;Brazil =&gt; Portuguese&quot;                
+##  [8] &quot;Burmese_language =&gt; English&quot;         
+##  [9] &quot;Caffè_crema =&gt; English&quot;              
+## [10] &quot;Canada =&gt; English&quot;                   
+## [11] &quot;Cantonese =&gt; Mandarin&quot;               
+## [12] &quot;Charles_II_of_England =&gt; English&quot;    
+## [13] &quot;Coffeehouse =&gt; English&quot;              
+## [14] &quot;Commonwealth_of_Nations =&gt; English&quot;  
+## [15] &quot;Cornwall =&gt; English&quot;                 
+## [16] &quot;Costa_Rica =&gt; English&quot;               
+## [17] &quot;Dutch_East_India_Company =&gt; English&quot; 
+## [18] &quot;Dutch_language =&gt; English&quot;           
+## [19] &quot;East_India_Company =&gt; English&quot;       
+## [20] &quot;Encyclopædia_Britannica =&gt; English&quot;  
+## [21] &quot;English_language =&gt; English&quot;         
+## [22] &quot;English_people =&gt; English&quot;           
+## [23] &quot;Etymology =&gt; English&quot;                
+## [24] &quot;Finland =&gt; English&quot;                  
+## [25] &quot;France =&gt; English&quot;                   
+## [26] &quot;French_language =&gt; English&quot;          
+## [27] &quot;German_language =&gt; English&quot;          
+## [28] &quot;Hindi =&gt; English&quot;                    
+## [29] &quot;Hokkien =&gt; Mandarin&quot;                 
+## [30] &quot;Honduras =&gt; Spanish&quot;                 
+## [31] &quot;Iceland =&gt; English&quot;                  
+## [32] &quot;Iran =&gt; English&quot;                     
+## [33] &quot;Japanese_language =&gt; English&quot;        
+## [34] &quot;Jeremiah_Curtin =&gt; English&quot;          
+## [35] &quot;Jews =&gt; Hebrew&quot;                      
+## [36] &quot;Kashrut =&gt; Hebrew&quot;                   
+## [37] &quot;Kenya =&gt; English&quot;                    
+## [38] &quot;Kingston_upon_Hull =&gt; English&quot;       
+## [39] &quot;Korean_language =&gt; English&quot;          
+## [40] &quot;Latin_America =&gt; English&quot;            
+## [41] &quot;Latte =&gt; English&quot;                    
+## [42] &quot;Luxembourg =&gt; English&quot;               
+## [43] &quot;Macau =&gt; Portuguese&quot;                 
+## [44] &quot;Mandarin_Chinese =&gt; Mandarin&quot;        
+## [45] &quot;Middle_East =&gt; Arabic&quot;               
+## [46] &quot;Myanmar =&gt; English&quot;                  
+## [47] &quot;Mysore =&gt; English&quot;                   
+## [48] &quot;Netherlands =&gt; English&quot;              
+## [49] &quot;New_Amsterdam =&gt; English&quot;            
+## [50] &quot;Nicaragua =&gt; Spanish&quot;                
+## [51] &quot;North_Africa =&gt; Arabic&quot;              
+## [52] &quot;Norway =&gt; English&quot;                   
+## [53] &quot;Ottoman_Turkish =&gt; Arabic&quot;           
+## [54] &quot;Oxford_English_Dictionary =&gt; English&quot;
+## [55] &quot;Oxford_University_Press =&gt; English&quot;  
+## [56] &quot;Pashtuns =&gt; English&quot;                 
+## [57] &quot;Passover =&gt; Hebrew&quot;                  
+## [58] &quot;Persian_language =&gt; Arabic&quot;          
+## [59] &quot;Polish_language =&gt; English&quot;          
+## [60] &quot;Red_Sea =&gt; Hebrew&quot;                   
+## [61] &quot;Russia =&gt; Russian&quot;                   
+## [62] &quot;Russian_language =&gt; Russian&quot;         
+## [63] &quot;Samuel_Pepys =&gt; English&quot;             
+## [64] &quot;São_Paulo =&gt; Portuguese&quot;             
+## [65] &quot;Spanish_language =&gt; Spanish&quot;         
+## [66] &quot;Sri_Lanka =&gt; English&quot;                
+## [67] &quot;Sweden =&gt; English&quot;                   
+## [68] &quot;Tea_(meal) =&gt; English&quot;               
+## [69] &quot;Tea_culture =&gt; English&quot;              
+## [70] &quot;Tea_in_the_United_Kingdom =&gt; English&quot;
+## [71] &quot;Teochew_dialect =&gt; Mandarin&quot;         
+## [72] &quot;The_New_York_Times =&gt; Spanish&quot;       
+## [73] &quot;Tonne =&gt; English&quot;                    
+## [74] &quot;Tsar =&gt; English&quot;                     
+## [75] &quot;Turkish_language =&gt; English&quot;         
+## [76] &quot;United_Kingdom =&gt; English&quot;           
+## [77] &quot;Urdu =&gt; English&quot;                     
+## [78] &quot;Varieties_of_Chinese =&gt; Mandarin&quot;    
+## [79] &quot;Voltaire =&gt; English&quot;                 
+## [80] &quot;Wu_Chinese =&gt; Mandarin&quot;</code></pre>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>ner <span class="sc">%&gt;%</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(entity_type <span class="sc">==</span> <span class="st">&quot;DATE&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(doc_id, entity) <span class="sc">%&gt;%</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="fu">sm_count</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(doc_id, <span class="fu">desc</span>(count)) <span class="sc">%&gt;%</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(count <span class="sc">&gt;</span> <span class="dv">10</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">lab =</span> <span class="fu">paste</span>(doc_id, entity, <span class="at">sep =</span> <span class="st">&quot; =&gt; &quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">use_series</span>(lab)</span></code></pre></div>
+<pre><code>##  [1] &quot;Age_of_Enlightenment =&gt; the 18th century&quot;   
+##  [2] &quot;American_Revolutionary_War =&gt; 1763&quot;         
+##  [3] &quot;Chengdu =&gt; 2010&quot;                            
+##  [4] &quot;China =&gt; 2018&quot;                              
+##  [5] &quot;Climate_change =&gt; 2050&quot;                     
+##  [6] &quot;Costa_Rica =&gt; 2015&quot;                         
+##  [7] &quot;Encyclopædia_Britannica =&gt; 2007&quot;            
+##  [8] &quot;Exchange-traded_fund =&gt; daily&quot;              
+##  [9] &quot;France =&gt; winters&quot;                          
+## [10] &quot;Futures_contract =&gt; daily&quot;                  
+## [11] &quot;Greece =&gt; 2009&quot;                             
+## [12] &quot;Haiti =&gt; 2010&quot;                              
+## [13] &quot;Honduras =&gt; 2009&quot;                           
+## [14] &quot;Iceland =&gt; 2016&quot;                            
+## [15] &quot;India =&gt; 2011&quot;                              
+## [16] &quot;Latin_America =&gt; 2019&quot;                      
+## [17] &quot;Manchu_people =&gt; the Qing dynasty&quot;          
+## [18] &quot;Melbourne =&gt; 2016&quot;                          
+## [19] &quot;Myanmar =&gt; 2010&quot;                            
+## [20] &quot;Pakistan =&gt; 1947&quot;                           
+## [21] &quot;Paris =&gt; 2018&quot;                              
+## [22] &quot;Pike_Place_Market =&gt; 1977&quot;                  
+## [23] &quot;Russia =&gt; 2019&quot;                             
+## [24] &quot;Seventh-day_Adventist_Church =&gt; Seventh-day&quot;
+## [25] &quot;Sweden =&gt; 2006&quot;                             
+## [26] &quot;Tang_dynasty =&gt; the Tang dynasty&quot;           
+## [27] &quot;Thailand =&gt; 2017&quot;                           
+## [28] &quot;The_Independent =&gt; Sunday&quot;                  
+## [29] &quot;Today_(American_TV_program) =&gt; Today&quot;       
+## [30] &quot;Turkey =&gt; 2016&quot;                             
+## [31] &quot;Uganda =&gt; 2012&quot;                             
+## [32] &quot;United_Kingdom =&gt; 2011&quot;                     
+## [33] &quot;Vietnam =&gt; 2019&quot;                            
+## [34] &quot;War_of_1812 =&gt; 1812&quot;                        
+## [35] &quot;Wet_season =&gt; the wet season&quot;               
+## [36] &quot;Yuan_dynasty =&gt; the Yuan dynasty&quot;</code></pre>
 
 
 

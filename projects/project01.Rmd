@@ -19,8 +19,91 @@ Sys.setlocale("LC_TIME", "en_US.UTF-8")
 
 **Due Date**: 25 February 2021
 
+## General Instructions
+
 This page outlines the instructions for the first project. You should
 have a file `project01.Rmd` in your RStudio workspace where you can
-work on the project.
+work on the project. I find that students prefer having a consistent
+format for the projects, so I will attempt to keep the format the same
+throughout the semester.
 
-## Instructions
+On the due-date, your group is responsible for completing three elements:
+
+1. A short (about one-page single spaced) description of your work answering
+a subset of the questions below. Please submit as a Google Doc in your shared
+group Google Drive folder.
+2. A Google Slides presentation of your results, also submitted in your shared
+drive folder.
+3. Giving a presentation based on your slide show. This should be 8-10 minutes
+in length. I suggest having one member drive the slides and the others rotate
+describing the results.
+
+As described on the syllabus, the project will be graded as either Satisfactory
+or Unsatisfactory. I will provide additional feedback that you can address in
+the next project.
+
+## Specific Instructions
+
+This project uses a collection of movies reviews from IMDb. This is a classic
+data set in machine learning. You can read more about the collection as a
+whole [here](http://ai.stanford.edu/%7Eamaas/data/sentiment/). Each group will
+be assigned a slightly different subset of the corpus to explore; each subset
+considers the differences (or lack thereof) between different subsets of the
+corpus.
+
+The goal of your project is to apply the methods we have developed so far to
+explore your corpus and understand what features distinguish the two categories
+you have been assigned. Here are some things you should consider addressing:
+
+- How accurately can you classify the two groups based on the text on the
+validation data?
+- What terms most distinguish the groups? Are there any bigrams or skip
+grams that are particularly important? If you look at just verbs or adjectives
+does anything different pop up?
+- Looking at negative example from your best model, do you find it easy to
+identify the correct class or not?
+- If any of the most indicative terms seem surprising, apply KWiC to the
+data. Does that help explain why the term is predictive?
+- Is there a difference in the parts of speech used between the groups?
+- Create a confusion matrix and describe any patterns (interesting or not).
+
+I recommend looking into most of these, but feel free to skip parts that seem
+less relevant to your question. Likewise, consider extending the questions if
+an interesting idea comes from your analysis.
+
+You will find that most (perhaps all) of the results you want to show are
+tables and example reviews. Getting these into a slide show can be a bit
+annoying. Some approaches include: (1) highlight and copy texts from the
+clipboard, (2) screen shots of small tables or (3) save the table as a csv
+file, read into Excel or Googe Sheets, and paste as a table from there.
+
+## Groups
+
+Each group has a slightly different part of the corpus and a different
+prediction task. The full corpus contains reviews with 1-4 or 7-10 stars. You
+should be able to download your data set from within the `project01.Rmd` file.
+
+**Group 1**: `imdb_neg_extreme` Compare reviews of 1 star to those with 4.
+
+**Group 2**: `imdb_pos_extreme` Compare reviews of 7 stars to those with 10.
+
+**Group 3**: `imdb_polarity_extreme` Compare the 1 and 10 star reviews.
+
+**Group 4**: `imdb_polarity_mod` Compare the 4 and 7 star reviews.
+
+**Group 5**: `imdb_vs_extreme` Compare the extreme (1/10) reviews to the
+moderate (4/7) ones.
+
+**Group 6**: `imdb_cats_neg` Do a multiclass comparison of the 4 different
+negative scores.
+
+**Group 7**: `imdb_cats_pos` Do a multiclass comparison of the 4 different
+positive scores.
+
+**Group 8**: `imdb_cats_all` Do a multiclass comparison of all 8 categories.
+
+## Notes
+
+While working through the project, I typically find that many groups ask for
+help writing the same bits of code. Any notes that I want to share about how
+to do specific tasks will be added here as we work through the project.

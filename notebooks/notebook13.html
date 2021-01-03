@@ -11,7 +11,7 @@
 
 
 
-<title>Notebook 13: Word Embeddings</title>
+<title>Notebook 13: Spectral Clustering</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -489,7 +489,7 @@ summary {
 
 
 
-<h1 class="title toc-ignore">Notebook 13: Word Embeddings</h1>
+<h1 class="title toc-ignore">Notebook 13: Spectral Clustering</h1>
 
 </div>
 
@@ -498,10 +498,335 @@ summary {
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(forcats)</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggrepel)</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(smodels)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">theme_set</span>(<span class="fu">theme_minimal</span>())</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">dplyr.summarise.inform =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">width =</span> 77L)</span></code></pre></div>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(cleanNLP)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(magrittr)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">theme_set</span>(<span class="fu">theme_minimal</span>())</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">dplyr.summarise.inform =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">width =</span> 77L)</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea.csv&quot;</span>))</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>token <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea_token.csv.gz&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> token <span class="sc">%&gt;%</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(upos <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;NOUN&quot;</span>, <span class="st">&quot;ADJ&quot;</span>, <span class="st">&quot;ADV&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cnlp_utils_tfidf</span>(<span class="at">min_df =</span> <span class="fl">0.001</span>, <span class="at">max_df =</span> <span class="fl">0.5</span>, <span class="at">doc_set =</span> wiki<span class="sc">$</span>doc_id)</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>clusters <span class="ot">&lt;-</span> <span class="fu">sm_spectral_cluster</span>(X, <span class="at">max_depth =</span> <span class="dv">5</span>, <span class="at">balance =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>clusters</span></code></pre></div>
+<pre><code>## # A tibble: 1,131 x 3
+##    doc_id             cluster groups
+##    &lt;chr&gt;                &lt;dbl&gt; &lt;chr&gt; 
+##  1 16th_century            24 10111 
+##  2 21st_century            29 11100 
+##  3 AARP                    28 11011 
+##  4 Abdominal_surgery        3 00010 
+##  5 Acacia                  16 01111 
+##  6 Acid                     2 00001 
+##  7 Adal_Sultanate          26 11001 
+##  8 Aden                    26 11001 
+##  9 Adenosine_receptor       4 00011 
+## 10 Affogato                12 01011 
+## # … with 1,121 more rows</code></pre>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>clusters <span class="sc">%&gt;%</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sample_frac</span>(<span class="at">size =</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(cluster) <span class="sc">%&gt;%</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">doc_id =</span> <span class="fu">paste</span>(cluster, doc_id, <span class="at">sep =</span> <span class="st">&quot; =&gt; &quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">use_series</span>(doc_id)</span></code></pre></div>
+<pre><code>##   [1] &quot;1 =&gt; George_Poinar_Jr.&quot;                                 
+##   [2] &quot;1 =&gt; Spectroscopy&quot;                                      
+##   [3] &quot;1 =&gt; Mineral_(nutrient)&quot;                                
+##   [4] &quot;1 =&gt; Nematode&quot;                                          
+##   [5] &quot;1 =&gt; Insecticide&quot;                                       
+##   [6] &quot;1 =&gt; Lepidoptera&quot;                                       
+##   [7] &quot;1 =&gt; Environmental_impact_of_pesticides&quot;                
+##   [8] &quot;1 =&gt; Gastrointestinal_tract&quot;                            
+##   [9] &quot;1 =&gt; Beetle&quot;                                            
+##  [10] &quot;1 =&gt; Kuding&quot;                                            
+##  [11] &quot;2 =&gt; Food_browning&quot;                                     
+##  [12] &quot;2 =&gt; Xanthine&quot;                                          
+##  [13] &quot;2 =&gt; Niacin&quot;                                            
+##  [14] &quot;2 =&gt; Radical_(chemistry)&quot;                               
+##  [15] &quot;2 =&gt; Polyphenol&quot;                                        
+##  [16] &quot;2 =&gt; Solvent&quot;                                           
+##  [17] &quot;2 =&gt; Health_effects_of_phenols_and_polyphenols&quot;         
+##  [18] &quot;2 =&gt; Magnesium&quot;                                         
+##  [19] &quot;2 =&gt; Harmane&quot;                                           
+##  [20] &quot;2 =&gt; Phenolic_content_in_tea&quot;                           
+##  [21] &quot;3 =&gt; Health_effects_of_tea&quot;                             
+##  [22] &quot;3 =&gt; Health_effects_of_pesticides&quot;                      
+##  [23] &quot;3 =&gt; Indigestion&quot;                                       
+##  [24] &quot;3 =&gt; Gastroesophageal_reflux_disease&quot;                   
+##  [25] &quot;3 =&gt; Hua_Tuo&quot;                                           
+##  [26] &quot;3 =&gt; Heart_failure&quot;                                     
+##  [27] &quot;3 =&gt; Hypertension&quot;                                      
+##  [28] &quot;3 =&gt; Lung_cancer&quot;                                       
+##  [29] &quot;3 =&gt; Abdominal_surgery&quot;                                 
+##  [30] &quot;3 =&gt; Myocardial_infarction&quot;                             
+##  [31] &quot;4 =&gt; Caffeine&quot;                                          
+##  [32] &quot;4 =&gt; Caffeine-induced_anxiety_disorder&quot;                 
+##  [33] &quot;4 =&gt; Cognitive_deficit&quot;                                 
+##  [34] &quot;4 =&gt; Stimulant&quot;                                         
+##  [35] &quot;4 =&gt; Outcrossing&quot;                                       
+##  [36] &quot;4 =&gt; Parkinson&#39;s_disease&quot;                               
+##  [37] &quot;4 =&gt; Dementia&quot;                                          
+##  [38] &quot;4 =&gt; Caffeine_dependence&quot;                               
+##  [39] &quot;4 =&gt; Health_effects_of_wine&quot;                            
+##  [40] &quot;4 =&gt; Monoamine_oxidase_inhibitor&quot;                       
+##  [41] &quot;5 =&gt; Disease&quot;                                           
+##  [42] &quot;5 =&gt; Gynaecology&quot;                                       
+##  [43] &quot;5 =&gt; Fair_trade_debate&quot;                                 
+##  [44] &quot;5 =&gt; Small_for_gestational_age&quot;                         
+##  [45] &quot;5 =&gt; Triticale&quot;                                         
+##  [46] &quot;5 =&gt; Fair_trade_impact_studies&quot;                         
+##  [47] &quot;5 =&gt; Clinical_trial&quot;                                    
+##  [48] &quot;5 =&gt; Clinical_research&quot;                                 
+##  [49] &quot;5 =&gt; Statistical_significance&quot;                          
+##  [50] &quot;5 =&gt; USDA_National_Nutrient_Database&quot;                   
+##  [51] &quot;6 =&gt; Lists_of_countries_and_territories&quot;                
+##  [52] &quot;6 =&gt; Habitat_destruction&quot;                               
+##  [53] &quot;6 =&gt; Hemiptera&quot;                                         
+##  [54] &quot;6 =&gt; Infrared&quot;                                          
+##  [55] &quot;6 =&gt; Tobacco&quot;                                           
+##  [56] &quot;6 =&gt; Environmental_degradation&quot;                         
+##  [57] &quot;6 =&gt; Climate_change&quot;                                    
+##  [58] &quot;6 =&gt; Ice_age&quot;                                           
+##  [59] &quot;6 =&gt; Sustainable_coffee&quot;                                
+##  [60] &quot;6 =&gt; Virtual_water&quot;                                     
+##  [61] &quot;7 =&gt; Mount_Marsabit&quot;                                    
+##  [62] &quot;7 =&gt; Digital_object_identifier&quot;                         
+##  [63] &quot;7 =&gt; International_Standard_Book_Number&quot;                
+##  [64] &quot;8 =&gt; Systematic_review&quot;                                 
+##  [65] &quot;9 =&gt; Barista&quot;                                           
+##  [66] &quot;9 =&gt; List_of_coffee_drinks&quot;                             
+##  [67] &quot;9 =&gt; Demitasse_spoon&quot;                                   
+##  [68] &quot;9 =&gt; Latte_art&quot;                                         
+##  [69] &quot;9 =&gt; Marocchino&quot;                                        
+##  [70] &quot;9 =&gt; Café_con_leche&quot;                                    
+##  [71] &quot;9 =&gt; Bu_Zhi_Chun_tea&quot;                                   
+##  [72] &quot;9 =&gt; Lungo&quot;                                             
+##  [73] &quot;9 =&gt; Ristretto&quot;                                         
+##  [74] &quot;9 =&gt; Cuban_espresso&quot;                                    
+##  [75] &quot;10 =&gt; Espresso_machine&quot;                                 
+##  [76] &quot;10 =&gt; Cezve&quot;                                            
+##  [77] &quot;10 =&gt; Single-serve_coffee_container&quot;                    
+##  [78] &quot;10 =&gt; Coffee_filter&quot;                                    
+##  [79] &quot;10 =&gt; Coffee_vending_machine&quot;                           
+##  [80] &quot;10 =&gt; Instant_coffee&quot;                                   
+##  [81] &quot;10 =&gt; French_press&quot;                                     
+##  [82] &quot;10 =&gt; Coffee_extraction&quot;                                
+##  [83] &quot;10 =&gt; Vacuum_coffee_maker&quot;                              
+##  [84] &quot;10 =&gt; Indian_filter_coffee&quot;                             
+##  [85] &quot;11 =&gt; Shahi_haleeb&quot;                                     
+##  [86] &quot;11 =&gt; Infusion&quot;                                         
+##  [87] &quot;11 =&gt; Maghrebi_mint_tea&quot;                                
+##  [88] &quot;11 =&gt; Hong_Kong_tea_culture&quot;                            
+##  [89] &quot;11 =&gt; Tea_set&quot;                                          
+##  [90] &quot;11 =&gt; Chorreador&quot;                                       
+##  [91] &quot;11 =&gt; History_of_tea_in_China&quot;                          
+##  [92] &quot;11 =&gt; Hong_Kong-style_milk_tea&quot;                         
+##  [93] &quot;11 =&gt; Bai_Jiguan_tea&quot;                                   
+##  [94] &quot;11 =&gt; Yak_butter&quot;                                       
+##  [95] &quot;12 =&gt; Ultra-high-temperature_processing&quot;                
+##  [96] &quot;12 =&gt; Koththamalli&quot;                                     
+##  [97] &quot;12 =&gt; Inka_(drink)&quot;                                     
+##  [98] &quot;12 =&gt; List_of_national_drinks&quot;                          
+##  [99] &quot;12 =&gt; Moretta_(coffee)&quot;                                 
+## [100] &quot;12 =&gt; Kahlúa&quot;                                           
+## [101] &quot;12 =&gt; Coffee_cabinet&quot;                                   
+## [102] &quot;12 =&gt; Kurdish_coffee&quot;                                   
+## [103] &quot;12 =&gt; Drink&quot;                                            
+## [104] &quot;12 =&gt; Cocktail&quot;                                         
+## [105] &quot;13 =&gt; Economics_of_coffee&quot;                              
+## [106] &quot;13 =&gt; Fair_trade_coffee&quot;                                
+## [107] &quot;13 =&gt; Tea_Research_and_Extension_Station&quot;               
+## [108] &quot;13 =&gt; Coffee_production_in_Uganda&quot;                      
+## [109] &quot;13 =&gt; Futures_contract&quot;                                 
+## [110] &quot;13 =&gt; Coffee_production_in_Indonesia&quot;                   
+## [111] &quot;13 =&gt; Coffee_production_in_Cuba&quot;                        
+## [112] &quot;13 =&gt; Sucrose&quot;                                          
+## [113] &quot;13 =&gt; Coffee_production_in_Angola&quot;                      
+## [114] &quot;13 =&gt; Cereal&quot;                                           
+## [115] &quot;14 =&gt; List_of_countries_by_tomato_production&quot;           
+## [116] &quot;14 =&gt; List_of_countries_by_avocado_production&quot;          
+## [117] &quot;14 =&gt; Coffee_production_in_the_Philippines&quot;             
+## [118] &quot;14 =&gt; List_of_countries_by_grape_production&quot;            
+## [119] &quot;14 =&gt; List_of_Chinese_teas&quot;                             
+## [120] &quot;14 =&gt; List_of_countries_by_artichoke_production&quot;        
+## [121] &quot;14 =&gt; List_of_countries_by_eggplant_production&quot;         
+## [122] &quot;14 =&gt; List_of_countries_by_wheat_exports&quot;               
+## [123] &quot;14 =&gt; List_of_countries_by_potato_production&quot;           
+## [124] &quot;14 =&gt; List_of_countries_by_barley_production&quot;           
+## [125] &quot;15 =&gt; Jin_Jun_Mei_tea&quot;                                  
+## [126] &quot;15 =&gt; Vietnamese_tea&quot;                                   
+## [127] &quot;15 =&gt; Dongfang_meiren&quot;                                  
+## [128] &quot;15 =&gt; Huangshan_Maofeng&quot;                                
+## [129] &quot;15 =&gt; Baozhong_tea&quot;                                     
+## [130] &quot;15 =&gt; Tea_garden&quot;                                       
+## [131] &quot;15 =&gt; Golden_Monkey_tea&quot;                                
+## [132] &quot;15 =&gt; Bancha&quot;                                           
+## [133] &quot;15 =&gt; Bergamot_orange&quot;                                  
+## [134] &quot;15 =&gt; Dafang_tea&quot;                                       
+## [135] &quot;16 =&gt; Subtropics&quot;                                       
+## [136] &quot;16 =&gt; Vegetative_reproduction&quot;                          
+## [137] &quot;16 =&gt; Leucaena&quot;                                         
+## [138] &quot;16 =&gt; Fermentation_in_food_processing&quot;                  
+## [139] &quot;16 =&gt; Bean&quot;                                             
+## [140] &quot;16 =&gt; S795_coffee&quot;                                      
+## [141] &quot;16 =&gt; Camellia_taliensis&quot;                               
+## [142] &quot;16 =&gt; Coffea&quot;                                           
+## [143] &quot;16 =&gt; Ginger&quot;                                           
+## [144] &quot;16 =&gt; Spearmint&quot;                                        
+## [145] &quot;17 =&gt; Min_Chinese&quot;                                      
+## [146] &quot;17 =&gt; Xiang_Chinese&quot;                                    
+## [147] &quot;17 =&gt; Voiceless_postalveolar_affricate&quot;                 
+## [148] &quot;17 =&gt; Mandarin_Chinese&quot;                                 
+## [149] &quot;17 =&gt; Varieties_of_Chinese&quot;                             
+## [150] &quot;18 =&gt; Indian_subcontinent&quot;                              
+## [151] &quot;18 =&gt; Cantonese&quot;                                        
+## [152] &quot;18 =&gt; Zhongyuan&quot;                                        
+## [153] &quot;18 =&gt; Burmese_language&quot;                                 
+## [154] &quot;18 =&gt; Lamet_language&quot;                                   
+## [155] &quot;18 =&gt; Wa_people&quot;                                        
+## [156] &quot;18 =&gt; Middle_East&quot;                                      
+## [157] &quot;18 =&gt; Hokkien&quot;                                          
+## [158] &quot;18 =&gt; Korean_language&quot;                                  
+## [159] &quot;18 =&gt; Wu_Chinese&quot;                                       
+## [160] &quot;19 =&gt; English_people&quot;                                   
+## [161] &quot;19 =&gt; Hindi&quot;                                            
+## [162] &quot;19 =&gt; Etymology&quot;                                        
+## [163] &quot;19 =&gt; Persian_language&quot;                                 
+## [164] &quot;19 =&gt; Arabic&quot;                                           
+## [165] &quot;19 =&gt; Urdu&quot;                                             
+## [166] &quot;19 =&gt; Ottoman_Turkish&quot;                                  
+## [167] &quot;19 =&gt; Russian_language&quot;                                 
+## [168] &quot;20 =&gt; English_language&quot;                                 
+## [169] &quot;20 =&gt; Turkish_language&quot;                                 
+## [170] &quot;20 =&gt; Spanish_language&quot;                                 
+## [171] &quot;20 =&gt; Dutch_language&quot;                                   
+## [172] &quot;20 =&gt; Polish_language&quot;                                  
+## [173] &quot;20 =&gt; French_language&quot;                                  
+## [174] &quot;20 =&gt; Japanese_language&quot;                                
+## [175] &quot;20 =&gt; Per_capita&quot;                                       
+## [176] &quot;20 =&gt; German_language&quot;                                  
+## [177] &quot;21 =&gt; Mark_Pendergrast&quot;                                 
+## [178] &quot;21 =&gt; European_Fair_Trade_Association&quot;                  
+## [179] &quot;21 =&gt; American_Birding_Association&quot;                     
+## [180] &quot;21 =&gt; Oxford_English_Dictionary&quot;                        
+## [181] &quot;21 =&gt; Ten_Speed_Press&quot;                                  
+## [182] &quot;21 =&gt; Great_Soviet_Encyclopedia&quot;                        
+## [183] &quot;21 =&gt; European_Food_Safety_Authority&quot;                   
+## [184] &quot;21 =&gt; Oxford_University_Press&quot;                          
+## [185] &quot;21 =&gt; Maxwell_House&quot;                                    
+## [186] &quot;21 =&gt; Today_(American_TV_program)&quot;                      
+## [187] &quot;22 =&gt; Google_Books&quot;                                     
+## [188] &quot;22 =&gt; National_Diet_Library&quot;                            
+## [189] &quot;22 =&gt; JSTOR&quot;                                            
+## [190] &quot;22 =&gt; DMOZ&quot;                                             
+## [191] &quot;22 =&gt; National_Archives_and_Records_Administration&quot;     
+## [192] &quot;22 =&gt; OCLC&quot;                                             
+## [193] &quot;22 =&gt; Online_Etymology_Dictionary&quot;                      
+## [194] &quot;22 =&gt; Massachusetts_Historical_Society&quot;                 
+## [195] &quot;22 =&gt; Library_of_Congress_Control_Number&quot;               
+## [196] &quot;22 =&gt; Wayback_Machine&quot;                                  
+## [197] &quot;23 =&gt; Mormons&quot;                                          
+## [198] &quot;23 =&gt; James_Otis_Jr.&quot;                                   
+## [199] &quot;23 =&gt; Seventh-day_Adventist_Church&quot;                     
+## [200] &quot;23 =&gt; Voltaire&quot;                                         
+## [201] &quot;23 =&gt; Zen&quot;                                              
+## [202] &quot;23 =&gt; Ibn_Hajar_al-Haytami&quot;                             
+## [203] &quot;23 =&gt; Sufism&quot;                                           
+## [204] &quot;23 =&gt; Allen_Ginsberg&quot;                                   
+## [205] &quot;23 =&gt; Shadhili&quot;                                         
+## [206] &quot;23 =&gt; Coptic_Orthodox_Church_in_Africa&quot;                 
+## [207] &quot;24 =&gt; Jews&quot;                                             
+## [208] &quot;24 =&gt; North_Africa&quot;                                     
+## [209] &quot;24 =&gt; Catherine_of_Braganza&quot;                            
+## [210] &quot;24 =&gt; Shu_(state)&quot;                                      
+## [211] &quot;24 =&gt; Jerzy_Franciszek_Kulczycki&quot;                       
+## [212] &quot;24 =&gt; 16th_century&quot;                                     
+## [213] &quot;24 =&gt; Tibetan_people&quot;                                   
+## [214] &quot;24 =&gt; Tea_classics&quot;                                     
+## [215] &quot;24 =&gt; Lu_Yu&quot;                                            
+## [216] &quot;24 =&gt; Jean-Jacques_Rousseau&quot;                            
+## [217] &quot;25 =&gt; First_Opium_War&quot;                                  
+## [218] &quot;25 =&gt; Paul_Revere&quot;                                      
+## [219] &quot;25 =&gt; John_Burgoyne&quot;                                    
+## [220] &quot;25 =&gt; War_of_1812&quot;                                      
+## [221] &quot;25 =&gt; Battle_of_Vienna&quot;                                 
+## [222] &quot;25 =&gt; Royal_Navy&quot;                                       
+## [223] &quot;25 =&gt; American_Revolutionary_War&quot;                       
+## [224] &quot;25 =&gt; Tea_Act&quot;                                          
+## [225] &quot;25 =&gt; New_Amsterdam&quot;                                    
+## [226] &quot;25 =&gt; Second_Opium_War&quot;                                 
+## [227] &quot;26 =&gt; Qin_(state)&quot;                                      
+## [228] &quot;26 =&gt; Coffee_production_in_Sri_Lanka&quot;                   
+## [229] &quot;26 =&gt; Dutch_East_India_Company&quot;                         
+## [230] &quot;26 =&gt; Coffee_production_in_Haiti&quot;                       
+## [231] &quot;26 =&gt; Presidencies_and_provinces_of_British_India&quot;      
+## [232] &quot;26 =&gt; Gabriel_de_Clieu&quot;                                 
+## [233] &quot;26 =&gt; Murad_IV&quot;                                         
+## [234] &quot;26 =&gt; Zabid&quot;                                            
+## [235] &quot;26 =&gt; Berbera&quot;                                          
+## [236] &quot;26 =&gt; Zeila&quot;                                            
+## [237] &quot;27 =&gt; BBC_Radio_4&quot;                                      
+## [238] &quot;27 =&gt; The_Daily_Telegraph&quot;                              
+## [239] &quot;27 =&gt; The_Cook_and_the_Chef&quot;                            
+## [240] &quot;27 =&gt; CNN_Türk&quot;                                         
+## [241] &quot;27 =&gt; Per_annum&quot;                                        
+## [242] &quot;27 =&gt; Journal_of_the_Academy_of_Nutrition_and_Dietetics&quot;
+## [243] &quot;27 =&gt; Food_Network&quot;                                     
+## [244] &quot;27 =&gt; The_Irish_Times&quot;                                  
+## [245] &quot;27 =&gt; Australian_Broadcasting_Corporation&quot;              
+## [246] &quot;27 =&gt; Asia_Today&quot;                                       
+## [247] &quot;28 =&gt; Global_Exchange&quot;                                  
+## [248] &quot;28 =&gt; Peet&#39;s_Coffee&quot;                                    
+## [249] &quot;28 =&gt; Coffee_1&quot;                                         
+## [250] &quot;28 =&gt; United_States_Department_of_Labor&quot;                
+## [251] &quot;28 =&gt; Taiwan&quot;                                           
+## [252] &quot;28 =&gt; United_Nations&quot;                                   
+## [253] &quot;28 =&gt; List_of_countries_by_coffee_production&quot;           
+## [254] &quot;28 =&gt; Specialty_Coffee_Association_of_Indonesia&quot;        
+## [255] &quot;28 =&gt; Intercontinental_Exchange&quot;                        
+## [256] &quot;28 =&gt; Coffee_production_in_El_Salvador&quot;                 
+## [257] &quot;29 =&gt; Venice&quot;                                           
+## [258] &quot;29 =&gt; Coffee_production_in_Ivory_Coast&quot;                 
+## [259] &quot;29 =&gt; Coffee_production_in_Ecuador&quot;                     
+## [260] &quot;29 =&gt; China&quot;                                            
+## [261] &quot;29 =&gt; Bavaria&quot;                                          
+## [262] &quot;29 =&gt; Bosnia_and_Herzegovina&quot;                           
+## [263] &quot;29 =&gt; United_Kingdom&quot;                                   
+## [264] &quot;29 =&gt; Aleppo&quot;                                           
+## [265] &quot;29 =&gt; Vancouver_Island&quot;                                 
+## [266] &quot;29 =&gt; Culture_of_Pakistan&quot;                              
+## [267] &quot;30 =&gt; North_Beach,_San_Francisco&quot;                       
+## [268] &quot;30 =&gt; Mecca&quot;                                            
+## [269] &quot;30 =&gt; Pike_Place_Market&quot;                                
+## [270] &quot;30 =&gt; Milan&quot;                                            
+## [271] &quot;30 =&gt; Vienna&quot;                                           
+## [272] &quot;30 =&gt; São_Paulo&quot;                                        
+## [273] &quot;30 =&gt; American_University&quot;                              
+## [274] &quot;30 =&gt; Bamako&quot;                                           
+## [275] &quot;30 =&gt; Hobart&quot;                                           
+## [276] &quot;30 =&gt; Seoul&quot;                                            
+## [277] &quot;31 =&gt; Russia&quot;                                           
+## [278] &quot;31 =&gt; Italy&quot;                                            
+## [279] &quot;31 =&gt; Iceland&quot;                                          
+## [280] &quot;31 =&gt; Land_use_statistics_by_country&quot;                   
+## [281] &quot;31 =&gt; Wuyi_Mountains&quot;                                   
+## [282] &quot;31 =&gt; Mongolia&quot;                                         
+## [283] &quot;31 =&gt; Gilgit-Baltistan&quot;                                 
+## [284] &quot;31 =&gt; Java&quot;                                             
+## [285] &quot;31 =&gt; Kenya&quot;                                            
+## [286] &quot;31 =&gt; Khyber_Pakhtunkhwa&quot;                               
+## [287] &quot;32 =&gt; Southeastern_United_States&quot;                       
+## [288] &quot;32 =&gt; Lipton_Institute_of_Tea&quot;                          
+## [289] &quot;32 =&gt; Gaggia&quot;                                           
+## [290] &quot;32 =&gt; Molokai_coffee&quot;                                   
+## [291] &quot;32 =&gt; Café_Zimmermann&quot;                                  
+## [292] &quot;32 =&gt; Museo_del_Objeto_del_Objeto&quot;                      
+## [293] &quot;32 =&gt; Arabian_Peninsula&quot;                                
+## [294] &quot;32 =&gt; Perthshire&quot;                                       
+## [295] &quot;32 =&gt; Rize_Province&quot;                                    
+## [296] &quot;32 =&gt; Tibet&quot;</code></pre>
 
 
 

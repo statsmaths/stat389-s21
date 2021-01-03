@@ -19,8 +19,69 @@ Sys.setlocale("LC_TIME", "en_US.UTF-8")
 
 **Due Date**: 08 April 2021
 
+
+## General Instructions
+
 This page outlines the instructions for the first project. You should
 have a file `project04.Rmd` in your RStudio workspace where you can
-work on the project.
+work on the project. I find that students prefer having a consistent
+format for the projects, so I will attempt to keep the format the same
+throughout the semester.
 
-## Instructions
+On the due-date, your group is responsible for completing three elements:
+
+1. A short (about one-page single spaced) description of your work answering
+a subset of the questions below. Please submit as a Google Doc in your shared
+group Google Drive folder.
+2. A Google Slides presentation of your results, also submitted in your shared
+drive folder.
+3. Giving a presentation based on your slide show. This should be 8-10 minutes
+in length. I suggest having one member drive the slides and the others rotate
+describing the results.
+
+As described on the syllabus, the project will be graded as either Satisfactory
+or Unsatisfactory. I will provide additional feedback that you can address in
+the next project.
+
+## Specific Instructions
+
+For this project, part of the assignment is constructing your data set from
+Wikipeda. This can be done with the code in `project04-create.Rmd`. Following
+the method used in Notebook12, you will start with a small set of pages, and
+create a corpus of pages by following the links from those starting page(s).
+
+The choice of starting pages is completely up to your group. You may, for
+example, choose to start with one option, and then modify it based on the
+initial results. I will come around and make sure everyone is on the right
+track. Good options include large, generic pages such as
+[History](https://en.wikipedia.org/wiki/History),
+[Mathematics](https://en.wikipedia.org/wiki/Mathematics),
+[Mammal](https://en.wikipedia.org/wiki/Mammal), or
+[University](https://en.wikipedia.org/wiki/University). Other good options include
+"list" pages, such as
+[Early modern universities](https://en.wikipedia.org/wiki/List_of_early_modern_universities_in_Europe),
+[Sovereign States](https://en.wikipedia.org/wiki/List_of_sovereign_states),
+[U.S. Cities](https://en.wikipedia.org/wiki/List_of_United_States_cities_by_population), or
+[Fantasy Novels](https://en.wikipedia.org/wiki/List_of_fantasy_novels_(A–H)).
+My code even allows you to work with a language other than English, but please
+check with me as I can offer guidance on what other languages are complete
+enough (and have good-enough parsers) to work for the project. Ultimately, you
+should aim for somewhere in the range of 100-1500 pages.
+
+This project does not have a predictive modeling task associated to it. The
+goal is simply to explain your corpus to the rest of the class using the
+techniques we have learned, such as topic models, document clustering, TF-IDF,
+and KWiC. Consider including interesting visualizations in addition to tables
+and keep in mind that it is better to give a focused and interesting
+presentation, rather than a boring and encyclopedic one.
+
+## Groups
+
+Each group is free to determine how they would like to create their data set
+according to the instructions above.
+
+## Notes
+
+While working through the project, I typically find that many groups ask for
+help writing the same bits of code. Any notes that I want to share about how
+to do specific tasks will be added here as we work through the project.

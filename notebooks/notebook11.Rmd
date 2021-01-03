@@ -12,8 +12,111 @@ library(tidyverse)
 library(forcats)
 library(ggrepel)
 library(smodels)
+library(magrittr)
+library(cleanNLP)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
+```
+
+```{r, message=FALSE}
+food <- read_csv("data/food_page.csv")
+token <- read_csv("data/food_page_token.csv.gz")
+```
+
+```{r}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 2) %>%
+  sm_kmeans()
+```
+
+
+```{r, warning=FALSE}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 2) %>%
+  sm_kmeans() %>%
+  ggplot(aes(v1, v2)) +
+    geom_point(aes(color = factor(cluster))) +
+    scale_color_viridis_d()
+```
+
+```{r, warning=FALSE}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 2) %>%
+  sm_kmeans() %>%
+  ggplot(aes(v1, v2)) +
+    geom_point(aes(color = factor(cluster))) +
+    geom_text_repel(
+      aes(label = document, color = factor(cluster)), show.legend = FALSE
+    ) +
+    scale_color_viridis_d() +
+    labs(color = "Cluster") +
+    theme_void()
+```
+
+```{r}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 2) %>%
+  sm_kmeans() %>%
+  group_by(cluster) %>%
+  summarize(sm_paste(document)) %>%
+  use_series(document_paste)
+```
+
+
+
+
+```{r}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 2) %>%
+  sm_kmeans(cluster = 10) %>%
+  group_by(cluster) %>%
+  summarize(sm_paste(document)) %>%
+  use_series(document_paste)
+```
+
+
+```{r}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 10) %>%
+  sm_kmeans(cluster = 10) %>%
+  group_by(cluster) %>%
+  summarize(sm_paste(document)) %>%
+  use_series(document_paste)
+```
+
+```{r, warning=FALSE}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 3) %>%
+  sm_kmeans(cluster = 10) %>%
+  ggplot(aes(v1, v2)) +
+    geom_point(aes(color = factor(cluster))) +
+    geom_text_repel(
+      aes(label = document, color = factor(cluster)), show.legend = FALSE
+    ) +
+    labs(color = "Cluster") +
+    theme_void()
+```
+
+
+```{r}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_umap(n = 2) %>%
+  sm_kmeans(cluster = 10) %>%
+  ggplot(aes(v1, v2)) +
+    geom_point(aes(color = factor(cluster))) +
+    geom_text_repel(
+      aes(label = document, color = factor(cluster)), show.legend = FALSE
+    ) +
+    labs(color = "Cluster") +
+    theme_void()
 ```

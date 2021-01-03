@@ -8,18 +8,20 @@ library(tidyverse)
 library(ggrepel)
 library(smodels)
 library(stringi)
+library(Matrix)
+library(glmnet)
+library(cleanNLP)
+library(magrittr)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 ```
 
-# Project 1
+# Load and Download the Data
 
-The project instructions are linked to from the course website. This is just a
-template file to give you a space to work on the project. Start by running the
-code block above, and then use as many blocks below as needed to read in the
-dataset and create your graphic.
-
-```{r}
-
+```{r, message=FALSE}
+wiki <- read_csv(file.path("data", "wiki_project04.csv"))
+token <- read_csv(file.path("data", "wiki_project04_token.csv.gz"))
 ```
+
+# Project Code

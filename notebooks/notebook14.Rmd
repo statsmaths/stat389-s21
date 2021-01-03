@@ -1,5 +1,5 @@
 ---
-title: "Notebook 14: Language Detection"
+title: "Notebook 14: Named Entity Recognition"
 output:
   html_document:
     theme: cosmo
@@ -12,8 +12,79 @@ library(tidyverse)
 library(forcats)
 library(ggrepel)
 library(smodels)
+library(cleanNLP)
+library(magrittr)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
+
+
+```{r}
+wiki <- read_csv(file.path("data", "wiki_coffee_tea.csv"))
+```
+
+```{r, echo=FALSE, message=FALSE}
+token <- read_csv(file.path("data", "wiki_coffee_tea_token.csv.gz"))
+ner <- read_csv(file.path("data", "wiki_coffee_tea_entity.csv.gz"))
+```
+
+
+```{r, eval=FALSE}
+anno <- cnlp_annotate(wiki)
+token <- anno$token
+ner <- anno$entity
+```
+
+
+```{r}
+ner
+```
+
+```{r}
+ner %>%
+  group_by(entity_type) %>%
+  summarize(sm_count()) %>%
+  arrange(desc(count))
+```
+
+```{r}
+ner %>%
+  filter(entity_type == "GPE") %>%
+  group_by(doc_id, entity) %>%
+  summarize(sm_count()) %>%
+  arrange(doc_id, desc(count)) %>%
+  slice_head(n = 1) %>%
+  filter(count > 20) %>%
+  mutate(lab = paste(doc_id, entity, sep = " => ")) %>%
+  use_series(lab)
+```
+
+
+
+```{r}
+ner %>%
+  filter(entity_type == "LANGUAGE") %>%
+  group_by(doc_id, entity) %>%
+  summarize(sm_count()) %>%
+  arrange(doc_id, desc(count)) %>%
+  slice_head(n = 1) %>%
+  filter(count > 4) %>%
+  mutate(lab = paste(doc_id, entity, sep = " => ")) %>%
+  use_series(lab)
+```
+
+
+```{r}
+ner %>%
+  filter(entity_type == "DATE") %>%
+  group_by(doc_id, entity) %>%
+  summarize(sm_count()) %>%
+  arrange(doc_id, desc(count)) %>%
+  slice_head(n = 1) %>%
+  filter(count > 10) %>%
+  mutate(lab = paste(doc_id, entity, sep = " => ")) %>%
+  use_series(lab)
+```
+
