@@ -1,0 +1,403 @@
+---
+title: "Lab 02"
+output: html_document
+---
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+library(Matrix)
+library(glmnet)
+library(cleanNLP)
+library(magrittr)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+```
+
+## Diamonds
+
+Here, we will apply the methods shown in the notes to a data set of diamonds.
+This is a classic statistics data set used in a lot of notes that you may
+find online. Our variable of interest is the price of each diamond.
+
+```{r, message=FALSE}
+set.seed(1)
+
+diamond <- read_csv(file.path("data", "diamonds.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+diamond
+```
+
+Start by creating a scatter plot with carat on the x-axis and price on the
+y-axis.
+
+```{r, question-01}
+diamond %>%
+  ggplot(aes(carat, price)) +
+    geom_point()
+```
+
+Before we start building predictive models, it is good to have a baseline for
+a good RMSE. Compute the RMSE on the train and valid sets using a model that
+just takes the mean value of `price`.
+
+```{r, question-02}
+diamond %>%
+  mutate(pred_const = mean(price)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((price - pred_const)^2)))
+```
+
+Now, buimd a model that predicts price as a function of a diamond's carat on
+the training set. Calculate the RMSE for the training and validation sets.
+
+```{r, question-03}
+model <- diamond %>%
+  filter(train_id == "train") %>%
+  lm(price ~ carat, data = .)
+
+diamond %>%
+  mutate(pred_lm = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((price - pred_lm)^2)))
+```
+
+These should be almost half the size of the RMSE you had for the constant
+model.
+
+Now, add color (a categorical variable) into the model and compute the RMSE.
+
+```{r, question-04}
+model <- diamond %>%
+  filter(train_id == "train") %>%
+  lm(price ~ carat + color, data = .)
+
+diamond %>%
+  mutate(pred_lm = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((price - pred_lm)^2)))
+```
+
+Does the RMSE improve? **Answer**: Yes, by a little bit.
+
+Now, print a summary of the model you just created.
+
+```{r, question-05}
+summary(model)
+```
+
+For a given size, what color seems to be the most expensive? **Answer** F.
+
+Now, fit a model that uses carat and clarity to predict the price of a diamond.
+Compute the RMSE of this model and compare to the previous two models.
+
+```{r, question-06}
+model <- diamond %>%
+  filter(train_id == "train") %>%
+  lm(price ~ carat + clarity, data = .)
+
+diamond %>%
+  mutate(pred_lm = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((price - pred_lm)^2)))
+```
+
+Modify the previous model to include a different slope and interecept for each
+clarity. Again, compute the RMSE.
+
+```{r, question-07}
+model <- diamond %>%
+  filter(train_id == "train") %>%
+  lm(price ~ carat * clarity, data = .)
+
+diamond %>%
+  mutate(pred_lm = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((price - pred_lm)^2)))
+```
+
+Takign the model from the previous question, predict prices for all of the
+diamands and plot the fit on a plot with carat on the x-axis, price on the
+y-axis, and lines colored by clarity. Verify that the lines have different
+slopes and intercepts.
+
+```{r, question-08}
+diamond %>%
+  mutate(pred_lm = predict(model, newdata = .)) %>%
+  ggplot(aes(carat, price)) +
+    geom_point(aes(color = clarity), alpha = 0.2) +
+    geom_line(aes(y = pred_lm, color = clarity))
+```
+
+The relationship between carat and price seems non-linear. Fit a linear
+regression using a 5th order polynomial of carat to predict the price of a
+diamond. Print out the RMSE.
+
+```{r, question-09}
+model <- diamond %>%
+  filter(train_id == "train") %>%
+  lm(price ~ poly(carat, 5), data = .)
+
+diamond %>%
+  mutate(pred_lm = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((price - pred_lm)^2)))
+```
+
+Plot the fit from the previous model (a scatter plot with a line through the
+data showing the fitted values). Verify that the fit is non-linear.
+
+```{r, question-10}
+diamond %>%
+  mutate(pred_lm = predict(model, newdata = .)) %>%
+  ggplot(aes(carat, price)) +
+    geom_point() +
+    geom_line(aes(y = pred_lm), color = "orange", size = 1.5)
+```
+
+The 4 C's that determine a diamond's prices are: cut, color, clarity, and
+carat (weight). Build a model that uses these four variables to predict the
+price of a diamon and print out the RMSE.
+
+```{r, question-11}
+model <- diamond %>%
+  filter(train_id == "train") %>%
+  lm(price ~ carat + cut + color + clarity, data = .)
+
+diamond %>%
+  mutate(pred_lm = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((price - pred_lm)^2)))
+```
+
+Finally, take the model from the previous question and change all of the pluses
+into `*` to create a four-way interaction. This has a different slope and
+intercept for each combination of all three variables. Print out the RMSE
+for the train and validation sets.
+
+```{r, warning=FALSE, question-12}
+model <- diamond %>%
+  filter(train_id == "train") %>%
+  lm(price ~ carat*cut*color*clarity, data = .)
+
+diamond %>%
+  mutate(pred_lm = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((price - pred_lm)^2)))
+```
+
+What do you notice here? **Answer** While the training RMSE is lower than any
+other model by a large amount, the model is very overfit. It's RMSE on the
+validation set is several orders of magnitude larger than the constant model.
+There are just too many variables to learn accurately given the size of the
+data.
+
+## Cars
+
+As a second data set, we will look at another class statistical programming
+data set of car models. The variable of interest is called `cty`, the fuel
+efficiency of the car in city traffic (miles per gallon).
+
+```{r, message=FALSE}
+set.seed(1)
+
+mpg <- read_csv(file.path("data", "mpg.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+mpg
+```
+
+### Predicting with hwy
+
+One variable in the data set is called `hwy`. It gives the fuel effiency for a
+car driving on the highway. As you might expect, this is a very good predictor
+of a car's fuel efficiency in the city. To start, let's get the RMSE of a model
+that just uses the mean of the `cty` variable for prediction.
+
+```{r, question-13}
+mpg %>%
+  mutate(pred = mean(cty)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((pred - cty)^2)))
+```
+
+Now fit a model on the training data where the highway fuel efficency is used
+to predict the city fuel efficency. Print out a summary of the model.
+
+```{r, question-14}
+model <- mpg %>%
+  filter(train_id == "train") %>%
+  lm(cty ~ hwy, data = .)
+
+summary(model)
+```
+
+According to the model, do you expect the city fuel efficiency to be higher in
+the city or the highway? **Answer** The value on the highway is higher, hence
+the coefficient of 0.7, which is less than 1. The positive intercept will not
+overtake this given the range of the `hwy` variable.
+
+```{r, question-15}
+mpg %>%
+  mutate(pred = predict(model, newdata = .)) %>%
+  ggplot(aes(hwy, cty)) +
+    geom_point() +
+    geom_line(aes(y = pred))
+```
+
+Now, compute the RMSE of this model. Verify that it is much lower than the
+constant model.
+
+```{r, question-16}
+mpg %>%
+  mutate(pred = predict(model, newdata = .)) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((pred - cty)^2)))
+```
+
+Now, let's try to re-fit this model using the matrix notation in R. To start,
+create a model matrix `X` and response vector `y` based on the same model you
+fit above. Print the head of the matrix.
+
+```{r, question-17}
+mf <- model.frame(cty ~ hwy, data = mpg)
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
+
+head(X)
+```
+
+Now, create a training design matrix and response vector.
+
+```{r, question-18}
+X_train <- X[mpg$train_id == "train", ]
+y_train <- y[mpg$train_id == "train"]
+```
+
+And fit the regression using `lm.fit`. Verify that the coefficients are
+very close (up to rounding) to the model you had from the `lm` function.
+
+```{r, question-19}
+beta <- lm.fit(X_train, y_train)$coef
+beta
+```
+
+And then re-compute the RMSE to verify that it is the same as in the previous
+model.
+
+```{r, question-20}
+mpg %>%
+  mutate(pred = X %*% beta) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((pred - cty)^2)))
+```
+Finally, just to show that it is possible, use the matrix product formulation
+at the bottom of my notes to show that you again get the same coefficients.
+
+```{r, question-21}
+solve(crossprod(X_train), crossprod(X_train, y_train))
+```
+
+### Predicting with engine size (displ)
+
+For one last model, create a scatter plot with the variable `displ` (the engine
+displacement; you can think of it as the size of the engine) on the x-axis and
+the city fuel efficency on the y-axis.
+
+```{r, question-22}
+mpg %>%
+  ggplot(aes(displ, cty)) +
+    geom_point()
+```
+
+You should notice that the relationship is non-linear. Fit a regression model
+predicting city fuel efficiency with the engine displacement using a 4th order
+polynomial expansion. Print out the model coefficients.
+
+```{r, question-23}
+model <- mpg %>%
+  filter(train_id == "train") %>%
+  lm(cty ~ poly(displ, 4), data = .)
+
+summary(model)
+```
+
+Now, plot the model fit to verify that it visually fits the data well.
+
+```{r, question-24}
+mpg %>%
+  mutate(pred = predict(model, newdata = .)) %>%
+  ggplot(aes(displ, cty)) +
+    geom_point() +
+    geom_line(aes(y = pred), color = "orange")
+```
+
+It will also be interesting to add in a categorical variable. Fit a regression
+model predicting city fuel efficiency with the engine displacement using a 4th
+order polynomial expansion and include the categorical variable drv. Print out
+the model coefficients.
+
+```{r, question-25}
+model <- mpg %>%
+  filter(train_id == "train") %>%
+  lm(cty ~ poly(displ, 4) + drv, data = .)
+
+summary(model)
+```
+
+As in the previous section, we are going to try to produce a model matrix
+to fit the same model using `lm.fit`. Start by creating the model matrix and
+response vector:
+
+```{r, question-26}
+mf <- model.frame(cty ~ poly(displ, 4) + drv, data = mpg)
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
+
+head(X)
+```
+
+Then create a model matrix and response vector just for the training set.
+
+```{r, question-27}
+X_train <- X[mpg$train_id == "train", ]
+y_train <- y[mpg$train_id == "train"]
+```
+
+And fit the regression using `lm.fit`.
+
+```{r, question-28}
+beta <- lm.fit(X_train, y_train)$coef
+beta
+```
+
+Look at the coefficients and compare to the ones in the model with with `lm()`.
+They are not the same! The last two are, but the others are all different.
+Compute the RMSE of the model:
+
+```{r, question-29}
+mpg %>%
+  mutate(pred = X %*% beta) %>%
+  group_by(train_id) %>%
+  summarize(rmse = sqrt(mean((pred - cty)^2)))
+```
+
+Confusingly, this **is** the same. What's going on here?!
+
+Run the code below to see the matrix product XtX, rounded to 10 decimal places:
+
+```{r}
+round(crossprod(X), 10)
+```
+
+What happens is that when R creates a polynomial expansion it uses an algorithm
+to ensure that the polynomial coefficients are uncorrelated. This is much more
+numerically stable than using, say, x, x^2, x^3, and so forth. In our
+formulation here the difference is that in lm() the polynomials were designed
+to be orthogonal on the training data; in the formulation here they are
+orthogonal on the entire data set. The fitted values are the same (it is still
+just a 4th order expansion), but the specific beta values are different.

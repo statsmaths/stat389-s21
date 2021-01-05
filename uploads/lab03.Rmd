@@ -2,3 +2,181 @@
 title: "Lab 03"
 output: html_document
 ---
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+library(Matrix)
+library(glmnet)
+library(cleanNLP)
+library(magrittr)
+library(forcats)
+
+theme_set(theme_minimal())
+options(dplyr.summarise.inform = FALSE)
+```
+
+## Flight Delays
+
+Today's lab will look at a data set of flights. Each flight provides an
+indicator of whether the flight arrived at least 15 minutes later than
+expected. I have subset the data so that there are an equal number of
+delayed flights as their are non-delayed flights.
+
+```{r, message=FALSE}
+set.seed(1)
+
+flights <- read_csv(file.path("data", "flights_small.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+flights
+```
+
+### Predicting Delays
+
+To start, using a linear regression model, predict whether a flight will be
+delayed using the variable `dep_hour`, the scheduled (local) hour of departure.
+Print out a summary of the model.
+
+```{r, question-01}
+
+```
+
+Does it appear that flights are more likely to be delayed earlier in the day
+or later in the day? **Answer**
+
+Using the model you just built, compute the classification rate on the training
+and validation set.
+
+```{r, question-02}
+
+```
+
+How well does the model perform relative to random guessing? **Answer**
+
+Next, build a confusion matrix from the data.
+
+```{r, question-03}
+
+```
+
+Now, build a logistic regression model using the same variable. Print out the
+model summary again.
+
+```{r, question-04}
+
+```
+
+And compute the classification rate.
+
+```{r, question-05}
+
+```
+
+How does this compare to the linear regression model? **Answer**
+
+### Comparing LM and GLM
+
+Next, let's build two models that use departure hour, distance, and carrier to
+predict delay. Build one linear model and one logistic model, produce predicted
+probabilities for both, and plot them again one another as I did in the notes.
+
+```{r, question-06}
+
+```
+
+How would you describe the relationship? **Answer**
+
+There are other options for how to relate the product Xb to the response vector
+y. The "canonical" option is the logistic function, but any function that maps
+the interval [0, 1] into the real numbers would work. Another possible choice
+is an inverse CDF function (if you have not taken probability, do not worry
+about the details). If we set the family to `binomial(link = "probit")`, this
+uses the inverse of a Gaussian/Normal distribution. Setting the link to by
+"cauchit" uses a Cauchy distribution.
+
+Repeat the code you had above, but use a Cauchy link function in place of the
+default.
+
+```{r, question-07}
+
+```
+
+How does this compare to the original curve? **Answer**
+
+### Precision and Recall
+
+So far we have used classification rate as our main metric for prediction
+purposes. This is the one we will use most this semester because it is the
+most relevant to multi-class prediction tasks, which will be our focus. However,
+there are other metrics which can be very useful when doing binary
+classification, particularly when we have a preference for a certain type of
+error (falsely classifying 1s as 0s, or vice-versa). Assume that we have two
+classes named 0 and 1, we can define the two quantities:
+
+- Precision: For the observations we predict to be 1, what proportion actually are?
+- Recall: What proportion of the total number of 1s did we correctly predict?
+
+Notice that these two quantities are in competition with one another. If we
+predict that every flight would be delayed, we have a perfect recall but a
+very low precision. Likewise, predicting none of the flights to be delayed
+gives a perfect precision but a recall of 0%. We have another metrics that
+gives a balance between the two extremes called the F1 score. It is defined as
+the harmonic mean of the precision and recall:
+
+  F1 = 2 * (precision * recall) / (precision + recall)
+
+In this section you are going to compute the precision recall, and F1 number
+for a specific model. Let's start by building a logistic regression model
+using the variables: departure hour, arrival house, carrier, origin,
+destination, distance, and weekday. Print out the classification rate so that
+we have something to compare to.
+
+```{r, question-08}
+
+```
+
+Next, using the definitions above, compute the precision, recall, and F1
+scores for the training and testing sets. You'll probably need some of the
+methods described in the **Using R to Manipulate and Visualize Data** linked
+to from the website.
+
+```{r, question-09}
+
+```
+
+You should see that the model provides a balance of precision and recall; both
+should be very similar. Now, copy the code from your previous solution, but
+classify points as a delay if the predicted value is greater than 0.3 (rather
+than 0.5):
+
+```{r, question-10}
+
+```
+
+What happens to the precision, recall, and F1 score? **Answer** The precision
+drops a bit, the recall increases significantly, and the F1 score increases
+by a good amount as well.
+
+Now, repeat with the cut-off 0.7:
+
+```{r, question-11}
+
+```
+
+What happens now? **Answer**
+
+Can you think of applications where we would prefer each of these models?
+
+### Your own model
+
+Finally, see if you can improve on the best classification rate by changing
+the variables. Try to add interactions or polynomial terms. You can also wrap
+numeric variables in the function `factor()` to convert them to a categorical
+variable if you think it will help.
+
+
+```{r, question-12}
+
+```

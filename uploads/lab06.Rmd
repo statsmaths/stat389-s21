@@ -2,3 +2,223 @@
 title: "Lab 06"
 output: html_document
 ---
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+library(Matrix)
+library(glmnet)
+library(cleanNLP)
+library(magrittr)
+
+theme_set(theme_minimal())
+options(sparse.colnames = TRUE)
+options(dplyr.summarise.inform = FALSE)
+```
+
+# U.S. Authors
+
+In this lab we will look at a corpus of short snippets of novels from three
+U.S. authors. The data have already been split into a training and validation
+set. All we need to do is read it in:
+
+```{r, message=FALSE}
+set.seed(1)
+
+us <- read_csv(file.path("data", "stylo_us.csv"))
+head(us)
+```
+
+I have also already run the corpus through the spaCy annotation engine and
+saved the tokens data set for you to work with in R. You can read it in with
+the following:
+
+```{r, message=FALSE}
+token <- read_csv(file.path("data", "stylo_us_token.csv.gz"))
+head(token)
+```
+
+## Understanding the data
+
+Before jumping into any other coding, use the three blocks below to randomly
+sample (using `sample_n`) 5 text documents from each of the three authors
+in the data: "Hawthorne", "Poe", "Twain".
+
+```{r, question-01}
+
+```
+
+```{r, question-02}
+
+```
+
+```{r, question-03}
+
+```
+
+You can see that the documents are just short snippets from various novels.
+
+## Building a predictive model
+
+Now, build a TF matrix using the parsed data and all of the available tokens.
+I recommend for now setting the minimum threshold for including a term to 0.001
+and the maximum to be 0.5. Print out the dimension of the data:
+
+```{r, question-04}
+
+```
+
+Now, fit an elastic net model using this data with alpha equal to 0.9 and three
+folds.
+
+```{r, warning = FALSE, question-05}
+
+```
+
+And then compute the classification rate on the training and validation data:
+
+```{r, question-06}
+
+```
+
+Next, produce a confusion matrix:
+
+```{r, question-07}
+
+```
+
+You should find that the model almost perfects predicts the training data but
+performs much worse on the validation data. What is going on here? Let's look
+at the terms that are the most powerful in the penalized regression model.
+Below, display the coefficients by picking a lambda that yields around 20 terms:
+
+```{r, question-08}
+
+```
+
+What type of terms show up here? **Answer**
+
+The difficulty with this task is that the data have not been split into training
+and validation at random. Rather, each novel has been associated with the entire
+training or validation data set. This means that a character might be in a novel
+that is in many fragments from one one (such as "Tom" from Mark Twain or
+"Clifford" from Nathaniel Hawthorne), but that this will not be useful in the
+validation data.
+
+## POS Filtering
+
+In the code block below, create a TF matrix of just lemmas that are adjectives
+("ADJ"). This time do not cap the maximum proportion of documents that can
+contain a token. Fit an elastic net as above and print out the classification
+rate on the training and validation data.
+
+```{r, warning=FALSE, question-09}
+
+```
+
+Repeat with the "VERB" lemmas:
+
+```{r, warning=FALSE, question-10}
+
+```
+
+And once again with "PUNCT" marks:
+
+```{r, warning=FALSE, question-11}
+
+```
+
+How would you compare the error rates of these models? **Answer**
+
+## Exploring the NLP data
+
+For the remainder of the lab, we are going to use the data set to get familiar
+with the features that are available for building machine learning models. You
+may be inclined to rush, but try to take your own time here. It will pay off
+very soon.
+
+### Lemmas
+
+Let's start by seeing how the NLP engine has lemmatized the tokens. Filter
+the tokens to just those that have a lemma equal to "sit". Group by the
+universal part of speech and token, count the number of occurances, and
+arrange in descending order of the count. Take note of all of the tokens that
+get turned into the lemma "sit".
+
+```{r, question-12}
+
+```
+
+Repeat for the more dynamic verb "have". Notice the token "'ve" coming from
+the contraction "you've" and "'d" from "you'd", "he'd", or "she'd".
+
+```{r, question-13}
+
+```
+
+Let's see what happens to a noun. Repeat the process for the term "bird":
+
+```{r, question-14}
+
+```
+
+Notice that it includes the singular and plural form of the word.
+
+Finally, do the same with the lemma "-PRON-".
+
+```{r, question-15}
+
+```
+
+You should notice that spaCy has turned all pronouns into a generic lemma
+"-PRON-". This is often not idea and something that we will sometimes want
+to adjust before creating a model.
+
+### XPOS Tags
+
+In the notes for today, we saw the top lemmas associated with each UPOS tag.
+Repeat the process here with the `xpos` tags and the tokens (rather than
+lemmas). It is probably useful to group by both the `upos` and `xpos` tags
+(`group_by(upos, xpos, token)`).
+
+```{r, question-16}
+
+```
+
+Go through the list and try to understand what each of the tags captures. Use
+the spaCy reference or ask me to explain any that you are having trouble with.
+
+## Relations
+
+As described in the notes. Relations give links between words in a sentence
+describing specific grammatical connections. Here are the most common relations
+in the data set:
+
+```{r}
+token %>%
+  group_by(relation) %>%
+  summarize(sm_count()) %>%
+  arrange(desc(count))
+```
+
+And here is the code to identify several sentences that use the "nsubj" tag
+exactly once. I will save it as a temporary variable so that you can look at in
+the data viewer if you prefer.
+
+```{r}
+temp <- token %>%
+  group_by(doc_id, sid) %>%
+  filter(sum(relation == "nsubj") == 1) %>%
+  filter(max(tid) < 20) %>%
+  ungroup() %>%
+  select(sid, tid, token, upos, xpos, tid_source, relation) %>%
+  slice_head(n = 100)
+temp
+```
+
+Start by looking at the results above and understanding the "nsubj" tag and
+what it does. Then modify the code and look at these tags: "det", "advmod",
+"amod", "conj", "neg", "prep", and "compound". As above, use the spaCy guide
+to help with any that you find difficult to understand.

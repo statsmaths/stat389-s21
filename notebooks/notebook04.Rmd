@@ -363,7 +363,7 @@ rather than the internal one which is not?).
 The "g" in `glmnet` stands for the same generalized as in
 `glm` and `gam`. We can fit binomial and multinomial models
 by adjusting the family function. Here is an example with the
-NBA dataset:
+NBA data set:
 
 ```{r, message = FALSE}
 set.seed(1)
@@ -379,25 +379,30 @@ X_train <- X[nba$train_id == "train",]
 y_train <- y[nba$train_id == "train"]
 ```
 
-Unlike with `glm` and `gam`, we have to provide the family name in
-quotes and there is no link function to specify (logit is default
-and only choice):
+Unlike with `glm` we specify the name in quotes. We will use a "multinomial"
+model here so that our code can be used verbatim in situations with more than
+two categories.
 
 ```{r}
-model <- cv.glmnet(X_train, y_train, alpha = 0.9, family = "binomial")
+model <- cv.glmnet(X_train, y_train, alpha = 0.9, family = "multinomial")
 ```
 
 The internal representation of the model is almost exactly the same.
-Here, we see the most important variables in the model (notice that
-we can give multiple values of lambda):
+Here, we see the most important variables in the model for a specific value
+of lambda
 
 ```{r}
-coef(model, s = model$lambda[c(6, 10, 20)])
+temp <- coef(model, s = model$lambda[22])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
 ```
 
-So, shot distance seems to be the most important, followed
-by shot clock, and then touch time and closest defender
-height.
+The first column indicates those features that classify the 0 category (shot
+missed) and the second features that classify the 1 category (shot made). In
+this case they are the same magnitude and opposite signs. The different columns
+will include different information in the case of 3 or more categories.
 
 ### Cross-validation
 
@@ -446,7 +451,7 @@ dim(X)
 And fit the cross-validated elastic net model:
 
 ```{r}
-model <- cv.glmnet(X_train, y_train, alpha = 0.9, family = "binomial")
+model <- cv.glmnet(X_train, y_train, alpha = 0.9, family = "multinomial")
 ```
 
 Plotting the model visualizes the cross-validation
@@ -468,10 +473,21 @@ error of the predictions from the "best" model but often has
 significantly fewer variables in it. We can see that here:
 
 ```{r}
-mat <- coef(model, s = c(model$lambda.min, model$lambda.1se))
-mat[mat[,1] != 0, ]
+temp <- coef(model, s = model$lambda.min)
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
+
+```{r}
+temp <- coef(model, s = model$lambda.1se)
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
 ```
 
 Often, the best model on new data sets will be the model set with the
-lambda with a cross-validation lose 1 standard error greater than the minimum
+lambda with a cross-validation loss 1 standard error greater than the minimum
 value. It is also much easier to interpret the results.

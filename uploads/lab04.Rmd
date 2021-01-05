@@ -2,3 +2,210 @@
 title: "Lab 04"
 output: html_document
 ---
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+library(Matrix)
+library(glmnet)
+library(cleanNLP)
+library(magrittr)
+
+theme_set(theme_minimal())
+options(sparse.colnames = TRUE)
+options(dplyr.summarise.inform = FALSE)
+```
+
+# Chicago Crimes
+
+## Three Types
+
+Today's lab looks at a data set of reported crimes from the city of Chicago
+(if you were in my 289 class last semester, this should look familiar). Our
+prediction task is to predict the type of crime based on the features of the
+reported incident. To start, we'll look at a data set that has three crime
+types: "battery", "criminal damage", and "theft".
+
+```{r, message=FALSE}
+set.seed(1)
+
+chicago <- read_csv(file.path("data", "chi_crimes_3.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+chicago
+```
+
+Start by creating a model matrix, response vector, and training model matrix
+and response vector using all of the variables in the data set other than the
+`train_id`. This will be fairly large due to the large number of options for
+the variable `location`.
+
+```{r, question-01}
+
+```
+
+Now, fit a cross-validated elastic net model using 3 folds and alpha equal to
+0.9.
+
+```{r, question-02}
+
+```
+
+Next, plot the model using the `plot` function. Take note of the shape of the
+curve and the number of included variables (the numbers of the top of the plot)
+for each value of lambda.
+
+```{r, question-03}
+
+```
+
+And compute the classification rate for the data set.
+
+```{r, question-04}
+
+```
+
+How does this compare to random guessing (the data are balanced, with an equal
+number of crimes of each type)? **Answer**: 
+
+Now, build a confusion matrix of the data.
+
+```{r, question-05}
+
+```
+
+Focusing on the validation set, are some crimes harder to distinguish than
+others? **Answer**:
+
+Now, print out the coefficients for a value of lambda that selects about a
+dozen variables (perhaps try the 21st value of lambda).
+
+```{r, question-06}
+
+```
+
+Looking at the selected variables, what locations seem to be most associated
+with each type of crime? **Answer**:
+
+Now, refit the model using alpha equal to 0.1.
+
+```{r, question-07}
+
+```
+
+Now, plot the model.
+
+```{r, question-08}
+
+```
+
+Verify that more non-zero components are present at the minimul value of the
+CV-curve.
+
+## Twelve Types
+
+Let's now load another version of the crimes data, this time with 12 different
+categories. The data set is large, so in the interest of time we will only use
+5% of it for the training set to speed things along.
+
+```{r, message=FALSE}
+set.seed(1)
+
+chicago12 <- read_csv(file.path("data", "chi_crimes_12.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.05, "train", "valid"))
+chicago12
+```
+
+Again, build a model matrix and response vector with all of the variables other
+than `train_id`.
+
+```{r, question-09}
+
+```
+
+We are going to again fit a cross-validated elastic net model with alpha 0.9,
+and three folds. Add the option `trace.it = TRUE` to have a verbose print out
+of the model progress (it may take a minute or two depending on your machine).
+
+```{r, question-10}
+
+```
+
+Plot the model CV curve. Verify that the curve has a steeper bend for small
+values of lambda compared to the previous model.
+
+```{r, question-11}
+
+```
+
+Now, determine the classification rate.
+
+```{r, question-12}
+
+```
+
+How does this compare to random guessing (the data are balanced, with an equal
+number of crimes of each type)? **Answer**:
+
+As before, produce a confusion matrix of the model:
+
+```{r, question-13}
+
+```
+
+What are some crimes that seem difficult to tell apart on the validation set?
+**Answer**:
+
+For each (actual) crime type, compute the error rate for this category on the
+validation set and arrange the data from the highest classification rate to
+the lowest.
+
+```{r, question-14}
+
+```
+
+What types are the hardest to get correct? **Answer**:
+
+Finally, print out the coefficients for the model by picking a lambda that
+gives about 20 non-zero terms. Take note of any patterns you see in the detected
+locations.
+
+```{r, question-15}
+
+```
+
+## Space and Time
+
+Using the smaller Chicago data set with just three crimes, create a model matrix
+with the following formula:
+
+`crime_type ~ cut(longitude, breaks = 10) * cut(latitude, breaks = 10) * cut(hour, breaks = 3)`
+
+This breaks space and time into individual buckets.
+
+```{r, question-16}
+
+```
+
+Now, fit a cross-validate elastic net on the data using alpha = 0.9 and three
+folds. This may take a minute or two to run, so consider turning on the
+`traceit` flag.
+
+```{r, question-17}
+
+```
+
+Finally, predict the class impied by the model for the data set and produce a
+scatter plot with longitude on the x-axis, latitude on the y-axis, and the
+points colored by the prediction. Also, add this facet wrap layer to produce
+a different plot for each third of the day:
+`facet_wrap(~cut(hour, breaks = 3), ncol = 4)`
+
+```{r, question-18}
+
+```
+
+Take note of the patterns of Crime in different parts of the city for different
+times of day. Notice how well our predictive model is able to describe patterns
+that would be hard to find just exploring the source data itself.

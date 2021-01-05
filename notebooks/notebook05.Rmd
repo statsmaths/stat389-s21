@@ -238,7 +238,9 @@ The **glmnet** package is able to work directly to sparse matrices, so we can
 run the model just as we did in the previous notebook.
 
 ```{r, warning=FALSE}
-model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "binomial")
+model <- cv.glmnet(
+  X_train, y_train, alpha = 0.2, family = "multinomial", nfolds = 3
+)
 ```
 
 How well does the model fit the data? It perfectly fits the training data and
@@ -255,8 +257,11 @@ Perhaps more importantly for us, we can use the selected coefficients to find
 those terms most associated with spam and ham:
 
 ```{r}
-mat <- coef(model, s = model$lambda[16])
-mat[apply(mat != 0, 1, any),,drop=FALSE]
+temp <- coef(model, s = model$lambda[16])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
 ```
 
 There is only one lemma associated with ham: "i" (the personal pronoun I). The

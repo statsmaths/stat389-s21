@@ -18,7 +18,7 @@ options(dplyr.summarise.inform = FALSE)
 ```
 
 This is the first "lab" for the semester. I have included several empty code
-chunks and text prompts that start with "**Answer:**". You should fill in 
+chunks and text prompts that start with "**Answer:**". You should fill in
 solutions to these (code in the first case and a short answer in the second).
 These are not handed in or graded and solutions will be posted for next class.
 I suggest generally working as a group with a single shared screen, but you
@@ -26,7 +26,7 @@ might want to also duplicate the code in your own machine.
 
 ## California House Prices
 
-In this lab you will apply the methods shown in the notes to a data set of 
+In this lab you will apply the methods shown in the notes to a data set of
 housing prices from California. Our variable of interest is the median
 house sale price in each census tract.
 
@@ -186,7 +186,7 @@ summary(model)
 ```
 
 How do the slope and intercept compare to the previous model? **Answer**: The
-slope is actually quite close (4.5 instead of 4.75). The intercept is lower 
+slope is actually quite close (4.5 instead of 4.75). The intercept is lower
 though, likely to account for the fact that the mean household income often
 being larger than the median household income.
 
@@ -200,7 +200,7 @@ ca %>%
 ```
 
 Which seems to be a more powerful estimator, the mean income or the median
-income of each region? **Answer**: The mean income has an RMSE around 138, 
+income of each region? **Answer**: The mean income has an RMSE around 138,
 less than the previous model. It seems that mean income is a better predictor
 than median income.
 
@@ -234,7 +234,7 @@ ca %>%
   summarize(rmse = sqrt(mean((median_house_value - value_pred_lm)^2)))
 ```
 
-How does this compare to the RMSE of the previous models? **Answer**: The 
+How does this compare to the RMSE of the previous models? **Answer**: The
 RMSE decreases very slightly compared to the previous model, from 138.5 down
 to 136.5.
 

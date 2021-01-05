@@ -1,0 +1,244 @@
+---
+title: "Lab 05"
+output: html_document
+---
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+library(Matrix)
+library(glmnet)
+library(cleanNLP)
+library(magrittr)
+
+theme_set(theme_minimal())
+options(sparse.colnames = TRUE)
+options(dplyr.summarise.inform = FALSE)
+```
+
+# Email Spam
+
+In this lab we will look at a different spam data set, this time using email
+rather than SMS records. Note that we do not want to print out the entire
+data set because RStudio has strange trouble printing large data sets that
+contain lengthy text fields.
+
+```{r, message=FALSE}
+set.seed(1)
+
+email <- read_csv(file.path("data", "spam_email.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+head(email)
+```
+
+## Building Manual Features
+
+To start, let's try to build manual features to predict whether a message is
+spam. Build a logistic regression model using the length of the message and
+3-5 hand constructed features (specific punctuation marks or words). Print
+out a summary of the model.
+
+```{r, warning = FALSE, question-01}
+model <- email %>%
+  mutate(
+    length = stri_length(text),
+    num_exclam = stri_count(text, fixed = "!"),
+    num_quest = stri_count(text, fixed = "?"),
+    num_commas = stri_count(text, fixed = ",")
+  ) %>%
+  filter(train_id == "train") %>%
+  glm(
+    class ~ length + num_exclam + num_quest + num_commas,
+    data = .,
+    family = binomial()
+  )
+
+summary(model)
+```
+
+According to the model, all other things being equal, are longer messages more
+or less likely to be spam? **Answer**: In my model, longer messages are more
+likely to not be spam.
+
+Now, compute the classification rate on the training and validation sets:
+
+```{r, question-02}
+email %>%
+  mutate(
+    length = stri_length(text),
+    num_exclam = stri_count(text, fixed = "!"),
+    num_quest = stri_count(text, fixed = "?"),
+    num_commas = stri_count(text, fixed = ",")
+  ) %>%
+  mutate(pred = predict(model, newdata = ., type = "response")) %>%
+  mutate(class_pred = (pred > 0.5)) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(class_pred == class))
+```
+
+Take note of how this compares to the classification rate in the notes from
+today.
+
+## Building Automatic Features
+
+Now, we will produce a tokenized version of the data set. The code below prints
+out progress every 500 documents. As with the `email` data set, we will try to
+avoid printing out the entire `token` table.
+
+```{r, warning=FALSE}
+cnlp_init_stringi()
+token <- cnlp_annotate(email, verbose = 500)$token
+head(token)
+```
+
+Determine the most common non-punctuation marks in the data set by counting the
+occurrences of every lemma and sorting them in descending order.
+
+```{r, question-03}
+token %>%
+  filter(upos == "X") %>%
+  group_by(lemma) %>%
+  summarize(sm_count()) %>%
+  arrange(desc(count))
+```
+
+Do you notice that some punctuation marks are, in fact, in this data set? This
+is because the stringi parser is not very accurate. We will see a better one
+next class.
+
+Now, building a TF matrix from the data set using the default parameters for the
+`cnlp_utils_tf` function. Also, create a training version of the matrix and a
+training response vector. Print out the dimension of the data matrix.
+
+```{r, question-04}
+X <- cnlp_utils_tf(token, doc_set = email$doc_id)
+X_train <- X[email$train_id == "train", ]
+y_train <- email$class[email$train_id == "train"]
+dim(X)
+```
+
+How many features have been created? **Answer**: 10000
+
+Now, create an elastic net model using three folds, alpha 0.9, and the TF
+matrix created above.
+
+```{r, question-05}
+model <- cv.glmnet(
+  X_train, y_train, alpha = 0.9, family = "multinomial", nfolds = 3
+)
+```
+
+Using this model, compute the classification rate for the training and
+validation sets in the `email` data.
+
+```{r, question-06}
+email %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(class == pred))
+```
+
+How does this compare with the hand-constructed features? **Answer**: The model
+has an almost perfect fit for the training set and a very high accuracy for the
+validation data (nearly 97%).
+
+Look at the coefficents from the model, selecting a lambda so that there are
+about twelve selected variables.
+
+```{r, question-07}
+temp <- coef(model, s = model$lambda[18])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
+
+Do these features and signs make sense / seem reasonable to you? Are any
+surprising? **Answer**: Answers vary.
+
+## Key Words in Context (KWiC)
+
+In the four code blocks below, use the `sm_kwic` function to look at 20
+occurrences of the more surprising/interesting terms you found above.
+
+```{r, question-08}
+sm_kwic("mailman", email$text, n = 20)
+```
+
+```{r, question-09}
+sm_kwic("wrote", email$text, n = 20)
+```
+
+```{r, question-10}
+sm_kwic("removed", email$text, n = 20)
+```
+
+```{r, question-11}
+sm_kwic("date", email$text, n = 20)
+```
+
+Does the KWiC method help explain why some of these are so predictive and/or
+why they are associated with a particular category? **Answer**: Answers vary.
+
+## Negative Examples
+
+In the code block below, print out the negative examples that are classified
+as spam but are actually ham. You might find it useful to add this line into
+the pipe to avoid printing very long messages:
+
+  `mutate(text = stri_sub(text, 1, 250)) %>%`
+
+
+```{r, question-12}
+email %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  filter(pred != class) %>%
+  filter(class == 0) %>%
+  mutate(text = stri_sub(text, 1, 250)) %>%
+  use_series(text)
+```
+
+Can you identify why these were incorrectly classified? **Answer**: Answers vary.
+
+And now print out the negative examples that are classified as ham but are
+actually spam.
+
+```{r, question-13}
+email %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  filter(pred != class) %>%
+  filter(class == 1) %>%
+  mutate(text = stri_sub(text, 1, 250)) %>%
+  use_series(text)
+```
+
+Can you identify why these were incorrectly classified? **Answer**: Answers vary.
+
+## Extreme Probabilities
+
+In the two blocks below, print out the emails that have the highest and lowest
+predicted probabilities. As in the previous code blocks, consider taking just
+the first 250 characters of the message.
+
+```{r, question-14}
+email %>%
+  mutate(pred = predict(model, newx = X, type = "response")) %>%
+  arrange(desc(pred)) %>%
+  slice_head(n = 10) %>%
+  mutate(text = stri_sub(text, 1, 250)) %>%
+  use_series(text)
+```
+
+```{r, question-15}
+email %>%
+  mutate(pred = predict(model, newx = X, type = "response")) %>%
+  arrange(pred) %>%
+  slice_head(n = 10) %>%
+  mutate(text = stri_sub(text, 1, 250)) %>%
+  use_series(text)
+```
+
+Do these help further explain how the classification algorithm is working? In
+what ways? **Answer**: Answers vary.
