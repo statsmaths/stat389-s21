@@ -8,8 +8,7 @@ author: "Taylor Arnold"
 This notebook installs all of the packaged needed for the other notebooks. If
 you are running this using the workspaces on RStudio Cloud, you should not need
 to re-run this. On your own machine, this is needed before proceeding through
-the other notebooks. See Notebook01 for information about how to run R code and
-how code is structure into packages.
+the other notebooks. 
 
 ```{r}
 install.packages(
