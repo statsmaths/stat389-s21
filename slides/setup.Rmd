@@ -1,7 +1,7 @@
 ---
 title: "Introduction to R and RStudio Cloud Setup"
 author: "Taylor Arnold"
-date: "2021-01-02"
+date: "2021-01-13"
 output:
   xaringan::moon_reader:
     lib_dir: libs
@@ -64,16 +64,15 @@ class: center, inverse, middle, title-slide
 
 # Local Setup (recommended)
 
-Some students may choose to run RStudio locally on their own machine rather than logging
-into RStudio cloud. This is perfectly fine, and does have several advantages: will work
-after the end of the semester, no need to internet access, and may be faster if you have
-a newer laptop.
+Due to some issues that arose with RStudio cloud last semester and the increased
+data sizes that we will be working with this semester, I recommend that you try
+to install R on your local machine.
 
-Note, however, that I will not be able to offer much technical support for alternative
-setups. I recommend setting up RStudio Cloud even if you intend to work locally in case
-you run into software problems later on. This is particularly true for students running
-Windows, which may run into unique errors during some of the later lessons on web scraping
-and text analysis.
+However, I will unfortunately not be able to offer much technical support given
+social distancing rules. In my experience, fixing issues usually requires me to
+physically work with your machine, which is not possible at the moment. In the
+case of extended difficulties, you should be able to use RStudio cloud to run
+the course code.
 
 ---
 
@@ -83,12 +82,14 @@ In order to setup the course materials locally you should:
 
 1. Install the [R programming language](https://cran.r-project.org/) language from CRAN.
 2. Install [RStudio](https://rstudio.com/products/rstudio/download/#download).
-3. Download and uncompress the zip file from the course website.
-4. Open the file `setup.R` in RStudio and run both chunks of code. Note that you may
-need to open the Console at the bottom and respond to a question about updating packages
-(you probably want to answer "yes").
+3. Download and uncompress the `[course code]` zip file from the course website.
+4. Open the file `setup.R` in RStudio and run both chunks of code. Note that you
+may need to open the Console at the bottom and respond to a question about
+updating packages (you probably want to answer "yes").
 
-Now you can open the other notebooks just as we are doing on RStudio Cloud.
+Note that if you have already installed a version of R on your machine, it is a
+good idea to re-install everything, particularly if it's been a few more than
+a year since you first installed it.
 
 ---
 class: center, inverse, middle, title-slide
