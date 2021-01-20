@@ -165,39 +165,13 @@ tea %>%
 Notice that this line under-guesses most of the score of teas, particularly
 if the number of reviews is low.
 
-## Brute Force
+## Computing the OLS Estimator in R
 
 How can we figure out what the best alpha and beta are for this
-model? The most straightforward way would be to just try a large
+model? A straightforward way would be to just try a large
 number of values and see which one minimizes the response. This
-is largely impractical but useful to see in this small example.
-It will also let you see some more involved R code.
-
-To start, we construct variables to hold the best sum of squares,
-alpha, and beta values. We then create a double loop cycling
-over all combinations of alpha and beta and testing whether the
-given configuration gives a better sum of squares compared to
-our current best value.
-
-```{r}
-params <- expand_grid(
-  a = seq(75, 120, by = 0.1), b = seq(0.0001, 0.01, by = 0.00001), sum_sqrs = NA_real_
-)
-params
-```
-
-```{r}
-params %>%
-  rowwise() %>%
-  mutate(sum_sqrs = sum((tea$score - (a + tea$num_reviews * b))^2)) %>%
-  ungroup() %>%
-  arrange(sum_sqrs)
-```
-
-## Using lm
-
-Now, we will compare the brute force algorithm with the lm function, which uses
-an analytic formula to compute the best fit:
+is largely impractical, and it is better to use an analytical approach,
+which we can compute in R using the `lm` function.
 
 ```{r, warning = FALSE}
 model <- tea %>%
@@ -206,12 +180,9 @@ model <- tea %>%
 summary(model)
 ```
 
-Our brute-force solution is actually quote close to this! Of course, it
-depended on me knowing approximately what the right slope and intercept
-should be. In this case that was easy graphically, but in more complex example
-it is a much more challenging task.
-
-We can use the predict function to fit predictions for model to our data:
+Notice that I am using the pipe notation here, and signaling that the data
+set needs to go into the `data` argument with the `.` sign. In a similar way,
+we can use the predict function to fit predictions for model to our data:
 
 ```{r}
 tea %>%
@@ -219,8 +190,7 @@ tea %>%
   select(score, name, score_pred_lm)
 ```
 
-And now plot the fitted values. Does it visually correspond to where you would
-expect the best fit line to run?
+And now plot the fitted values.
 
 ```{r, warning=FALSE}
 tea %>%
@@ -230,6 +200,8 @@ tea %>%
     geom_line(aes(num_reviews, score_pred_lm), color = "orange") +
     geom_segment(aes(xend = num_reviews, yend = score_pred_lm), alpha = 0.5)
 ```
+
+Does it visually correspond to where you would expect the best fit line to run?
 
 ## Evaluating models
 
@@ -272,8 +244,8 @@ tea %>%
 ```
 
 So, we have improved on the baseline model, but not by a large amount. Note that
-if you are familiar with the standard error, the RMSE of the mean is *almost*
-equal to the standard error of the response.
+if you are familiar with the standard deviation, the RMSE of the mean is
+*almost* equal to the standard deviation of the errors.
 
 ## Multivariate linear regression
 
@@ -310,7 +282,7 @@ linear regression from before:
 
 ```{r}
 tea %>%
-  mutate(score_pred_lm = mean(score)) %>%
+  mutate(score_pred_lm = predict(model, newdata = .)) %>%
   summarize(rmse = sqrt(mean((score - score_pred_lm)^2)))
 ```
 
@@ -327,8 +299,8 @@ validation set.
 
 Here is some code to add an indicator variable to the data splitting the data
 into a training and validation observations. The seed makes sure that the split
-is consistent; I have chosen to split the data into 60% training and 40%
-validation.
+is consistent (each time I run it, it will create the same split); I have
+chosen to split the data into 60% training and 40% validation.
 
 ```{r, message=FALSE}
 set.seed(1)
@@ -349,7 +321,7 @@ model <- tea %>%
 summary(model)
 ```
 
-Notice that the coefficients are slightly different now. Then, we will predict
+Notice that the coefficients are slightly different. Then, we will predict
 the model on the entire data set and find the RMSE on both the training and
 validation data:
 

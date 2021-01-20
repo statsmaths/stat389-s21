@@ -21,8 +21,7 @@ This is the first "lab" for the semester. I have included several empty code
 chunks and text prompts that start with "**Answer:**". You should fill in
 solutions to these (code in the first case and a short answer in the second).
 These are not handed in or graded and solutions will be posted for next class.
-I suggest generally working as a group with a single shared screen, but you
-might want to also duplicate the code in your own machine.
+I suggest generally working as a group with a single shared screen.
 
 ## California House Prices
 
