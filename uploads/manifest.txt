@@ -1,2 +1,3 @@
 lab01.Rmd
 note-style.css
+data/ca_house_price.csv
