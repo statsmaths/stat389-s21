@@ -1,3 +1,6 @@
 lab01.Rmd
+lab02.Rmd
 note-style.css
 data/ca_house_price.csv
+data/diamonds.csv
+data/mpg.csv
