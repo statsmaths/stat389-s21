@@ -34,7 +34,7 @@ flights
 ```
 ### Predicting Delays
 
-To start, using a linear regression model, predict whether a flight will be 
+To start, using a linear regression model, predict whether a flight will be
 delayed using the variable `dep_hour`, the scheduled (local) hour of departure.
 Print out a summary of the model.
 
@@ -55,7 +55,7 @@ Using the model you just built, compute the classification rate on the training
 and validation set.
 
 ```{r, question-02}
-flights %>% 
+flights %>%
   mutate(pred = as.numeric(predict(model, newdata = .) > 0.5)) %>%
   group_by(train_id) %>%
   summarize(class_rate = mean(pred == delayed))
@@ -69,7 +69,7 @@ amazing.
 Next, build a confusion matrix from the data.
 
 ```{r, question-03}
-flights %>% 
+flights %>%
   mutate(pred = as.numeric(predict(model, newdata = .) > 0.5)) %>%
   select(pred, delayed, train_id) %>%
   table()
@@ -89,7 +89,7 @@ summary(model)
 And compute the classification rate.
 
 ```{r, question-05}
-flights %>% 
+flights %>%
   mutate(pred = as.numeric(predict(model, newdata = ., type = "response") > 0.5)) %>%
   group_by(train_id) %>%
   summarize(class_rate = mean(pred == delayed))
@@ -122,7 +122,7 @@ flights %>%
     geom_abline(slope = 1, color = "orange")
 ```
 
-How would you describe the relationship? **Answer** The two predictions are 
+How would you describe the relationship? **Answer** The two predictions are
 quite similar, with a few small differences for the most extreme predictions.
 In those cases the logistic regression predicts a less extreme probability than
 the linear model.
@@ -159,7 +159,7 @@ flights %>%
 
 How does this compare to the original curve? **Answer** While still similar,
 the Cauchy link function differs from the linear regression more extremely and
-over the entire range. 
+over the entire range.
 
 ### Precision and Recall
 
@@ -174,7 +174,7 @@ classes named 0 and 1, we can define the two quantities:
 - Precision: For the observations we predict to be 1, what proportion actually are?
 - Recall: What proportion of the total number of 1s did we correctly predict?
 
-Notice that these two quantities are in competition with one another. If we 
+Notice that these two quantities are in competition with one another. If we
 predict that every flight would be delayed, we have a perfect recall but a
 very low precision. Likewise, predicting none of the flights to be delayed
 gives a perfect precision but a recall of 0%. We have another metrics that
@@ -183,8 +183,8 @@ the harmonic mean of the precision and recall:
 
   F1 = 2 * (precision * recall) / (precision + recall)
 
-In this section you are going to compute the precision recall, and F1 number 
-for a specific model. Let's start by building a logistic regression model 
+In this section you are going to compute the precision recall, and F1 number
+for a specific model. Let's start by building a logistic regression model
 using the variables: departure hour, arrival house, carrier, origin,
 destination, distance, and weekday. Print out the classification rate so that
 we have something to compare to.
@@ -201,13 +201,13 @@ model <- flights %>%
                 weekday,
       data = ., family = binomial())
 
-flights %>% 
+flights %>%
   mutate(pred = as.numeric(predict(model, newdata = ., type = "response") > 0.5)) %>%
   group_by(train_id) %>%
   summarize(class_rate = mean(pred == delayed))
 ```
 
-Next, using the definitions above, compute the precision, recall, and F1 
+Next, using the definitions above, compute the precision, recall, and F1
 scores for the training and testing sets. You'll probably need some of the
 methods described in the **Using R to Manipulate and Visualize Data** linked
 to from the website.
@@ -222,7 +222,7 @@ flights %>%
 ```
 
 You should see that the model provides a balance of precision and recall; both
-should be very similar. Now, copy the code from your previous solution, but 
+should be very similar. Now, copy the code from your previous solution, but
 classify points as a delay if the predicted value is greater than 0.3 (rather
 than 0.5):
 
@@ -257,12 +257,12 @@ Can you think of applications where we would prefer each of these models?
 
 ### Your own model
 
-Finally, see if you can improve on the best classification rate by changing 
+Finally, see if you can improve on the best classification rate by changing
 the variables. Try to add interactions or polynomial terms. You can also wrap
 numeric variables in the function `factor()` to convert them to a categorical
 variable if you think it will help.
 
-**Note:** I found the best model to include a factor on month and weekday and 
+**Note:** I found the best model to include a factor on month and weekday and
 polynomial expansion on the arrival and departure hours.
 
 ```{r, question-12}
@@ -278,7 +278,7 @@ model <- flights %>%
                 factor(weekday),
       data = ., family = binomial())
 
-flights %>% 
+flights %>%
   mutate(pred = as.numeric(predict(model, newdata = ., type = "response") > 0.50)) %>%
   group_by(train_id) %>%
   summarize(class_rate = mean(pred == delayed))
