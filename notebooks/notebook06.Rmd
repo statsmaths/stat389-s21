@@ -1,5 +1,5 @@
 ---
-title: "Notebook 06: Natural Language Processing"
+title: "Notebook 06: Text Prediction"
 output:
   html_document:
     theme: cosmo
@@ -12,295 +12,338 @@ library(tidyverse)
 library(forcats)
 library(ggrepel)
 library(smodels)
-library(cleanNLP)
 library(glmnet)
+library(Matrix)
+library(magrittr)
+library(stringi)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
+options(sparse.colnames = TRUE)
 options(width = 77L)
 ```
 
-## Amazon Product Classification
+## Spam Data
 
-In these notes we will look a data set of product reviews from Amazon. Reviews
-come from one of three different categories (Books, Films, and Food); the
-classification task we will investigate is the classification of items into
-one of these three categories.
+Today, we are going to look at our first two data sets containing textual data.
+For both, the classification task will be to distinguish "spam" from "ham". In
+the notes we will look at an older data set of text messages from the UK. The
+lab looks at a collection of email messages. Please note that both contain a
+relatively large amount of inappropriate language, though nothing that you
+would not expect to find in invasive spam messages.
+
+### Data set
+
+To start, we will read the spam data into R and create a training and validation
+split of the data.
 
 ```{r, message = FALSE}
 set.seed(1)
 
-amazon <- read_csv("data/amazon_product_class.csv") %>%
+spam <- read_csv("data/spam.csv") %>%
   mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
-amazon
+spam
 ```
 
-We will use a more sophisticated method for producing TF matrices and see how
-to work with text classification when there are more than two categories.
+All of the interesting features that we can use to detect spam are contained
+in the variable `text`, which consists of the message itself. Let's look at a
+few "ham" messages; I will use the `use_series` function in order to display
+the full text in the notebook:
 
-### Natural language processing (NLP)
-
-As we did in the previous notes, we will use the **cleanNLP** package to split
-the textual data into a format with one row for each token (word or punctuation
-mark). Last time we used the **stringi** backend, which is fast but error-prone.
-This time we will use a library called **spacy** for extracting linguistic
-features from the text. Running this back end can be done with the following
-code:
-
-```{r, eval=FALSE}
-cnlp_init_spacy("en_core_web_sm")
-token <- cnlp_annotate(amazon)$token
+```{r}
+spam %>%
+  filter(class == 0) %>%
+  sample_n(10) %>%
+  use_series(text)
 ```
 
-However, it requires having the Python library spacy already installed and set
-up on your machine. It also can take a few minutes to finish parsing the text.
-As an alternative, we will just load in the pre-computed data here (and I will
-provide similar parsed data for the lab and projects):
+And similarly, here are a random sample of spam messages:
 
-```{r, message = FALSE}
-token <- read_csv("data/amazon_product_class_token.csv.gz")
+```{r}
+spam %>%
+  filter(class == 1) %>%
+  sample_n(10) %>%
+  use_series(text)
+```
+
+Would you be able to classify these messages manually? Without worrying about
+the specifics, how would you do that?
+
+### Hand-constructing features
+
+In order to use any of the linear models that we have seen so far, we need to
+create numeric predictor variables ("features") from the data set. Often this
+has been only an issue of choosing which existing numeric variables to include
+in our model. Sometimes we needed to do a bit more works, such as using a
+polynomial expansion or indicator variables. When working with text, creating
+the feature variables is much more of an art-form. In fact, it is what we will
+spend much of the rest of the semester focused on.
+
+To start, let's create variables that count the occurrence of some characters
+that might be associated with spam. We will use the function `stri_count` to
+count the number of times the exclamantion mark, the question mark, and the
+pound (currency) symbol occur. We can also use `stri_length` to grab the entire
+length of the message. Here are what the features look like in the data:
+
+```{r}
+spam %>%
+  mutate(
+    length = stri_length(text),
+    num_exclam = stri_count(text, fixed = "!"),
+    num_quest = stri_count(text, fixed = "?"),
+    num_gbp = stri_count(text, fixed = "£")
+  ) %>%
+  select(class, length, num_exclam, num_quest, num_gbp)
+```
+
+Now that we have these features, let's build a logistic regression predicting
+whether a message is spam with them.
+
+```{r, warning = FALSE}
+model <- spam %>%
+  mutate(
+    length = stri_length(text),
+    num_exclam = stri_count(text, fixed = "!"),
+    num_quest = stri_count(text, fixed = "?"),
+    num_gbp = stri_count(text, fixed = "£")
+  ) %>%
+  filter(train_id == "train") %>%
+  glm(
+    class ~ length + num_exclam + num_quest + num_gbp,
+    data = .,
+    family = binomial
+  )
+
+summary(model)
+```
+
+We see that exclamation marks and pound signs are both associated with spam.
+Longer messages also tend to be spam. Question marks are negatively associated
+with spam, though the coefficent is not significant. How well does the model
+do predicting spam:
+
+```{r, warning = FALSE}
+spam %>%
+  mutate(
+    length = stri_length(text),
+    num_exclam = stri_count(text, fixed = "!"),
+    num_quest = stri_count(text, fixed = "?"),
+    num_gbp = stri_count(text, fixed = "£")
+  ) %>%
+  mutate(pred = predict(model, newdata = ., type = "response")) %>%
+  mutate(class_pred = (pred > 0.5)) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(class_pred == class))
+```
+
+It guesses correctly about 80% of the time. The data set was constructed to
+have exactly 50% spam and 50% ham, so a rate of 80% based on just four features
+is actually quite good!
+
+### Tokens and lemmas
+
+We could continue to iteratively guess features to create from our data set
+in order to improve the model. However, it will be much better to try to find a
+way to systematically find the best features that predict the class of the
+message. To do this, we will use the **cleanNLP** package, which will help us
+work with our textual data. We start by loading the package and initalizing
+the **stringi** backend (more on this next time).
+
+```{r}
+library(cleanNLP)
+
+cnlp_init_stringi()
+```
+
+Now, we call the function `cnlp_annotate()` on the spam data and save the
+result (a data frame) as a new variable.
+
+```{r, message=FALSE, warning=FALSE}
+token <- cnlp_annotate(spam, verbose = FALSE)$token
 token
 ```
 
-There is a lot of information that has been automatically added to this table,
-the collective results of decades of research in computational linguistics and
-natural language processing. Each row corresponds to a word or a punctuation
-mark, along with metadata describing the token. Notice that reading down the
-column `token` reproduces the original text. The columns available
-are:
+The annotation function creates a data frame with one row for each *token*
+(words and punctuation marks) in the data set. It has many more rows than
+the input dataset. Each token includes an indicator of which document it came
+from, as well as counters for the sentence within the document and the token
+within the sentence. There is also a column called `lemma` that contains a
+version of the token in lower case letters and a column called `upos` that
+indicates if a token is a word ("X") or punctuation mark ("PUNCT").
 
-- **doc_id**: A key that allows us to group tokens into documents and to link
-back into the original input table.
-- **sid**: Numeric identifier of the sentence number.
-- **tid**: Numeric identifier of the token within a sentence. The first three
-columns form a primary key for the table.
-- **token**: A character variable containing the detected token, which is either
-a word or a punctuation mark.
-- **token_with_ws**: The token with whitespace (i.e., spaces and new-line
-characters) added. This is useful if we wanted to re-create the original text
-from the token table.
-- **lemma**: A normalized version of the token. For example, it removes
-start-of-sentence capitalization, turns all nouns into their singular form,
-and converts verbs into their
-infinitive form.
-- **upos**: The universal part of speech code, which are parts of speech that
-can be defined in (most) spoken languages. These tend to correspond to the
-parts of speech taught in primary schools, such as "NOUN", "ADJ" (Adjective),
-and "ADV" (Adverb). The full set of codes and
-their meaning can be found here:
-[Universal POS tags](https://universaldependencies.org/u/pos/).
-- **xpos**: A fine-grained part of speech code that depends on the specific
-language (here, English) and models being used. You can find more information
-here: [spaCy POS tags](https://spacy.io/api/annotation#pos-tagging)
-- **tid_source** The token id of the word in the sentence that this token is
-grammatically related to. Relations always occur within a sentence, so there is
-no need for a seperate indication of the source **sid**.
-- **relation**: The name of the relation implied by the **tid_source** variable.
-Allowed relations differ slightly across models and languages, but the core set
-are relatively stable. The codes in this table are
-[Universal Dependencies](https://universaldependencies.org/en/dep/index.html).
-
-There are many analyses that can be performed on the extracted features in this
-table. We will look at a few here and expand on them over the next few weeks.
-
-### Fitting a model
-
-Before delving into the new variables in the tokens table, let's start by
-replicating the analysis we did last time with the spam data for the Amazon
-product category. Because this is a larger data set, we will set some additional
-parameters to the `cnlp_utils_tf` function to include only those terms that are
-in at least 0.1% of the corpus and no more than 50% of the corpus. We can also
-set the maximum number of terms that will be included.
-
-```{r}
-X <- token %>%
-  cnlp_utils_tf(doc_set = amazon$doc_id,
-                min_df = 0.001,
-                max_df = 0.5,
-                max_features = 10000)
-
-dim(X)
-```
-
-As before, we will create training data and run the glmnet function. Because
-have three classes this time, we set the family to "multinomial".
-
-```{r}
-X_train <- X[amazon$train_id == "train", ]
-y_train <- amazon$category[amazon$train_id == "train"]
-
-model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
-```
-
-Like the spam model, our penalized regression does a very good job of
-classifying products. The training set is nearly 99% accurate and the
-validation set is 96.5% accurate.
-
-```{r}
-amazon %>%
-  mutate(pred = predict(model, newx = X, type = "class")) %>%
-  group_by(train_id) %>%
-  summarize(class_rate = mean(category == pred))
-```
-
-Looking at a confusion matrix, we see that the few mistakes that do occur
-happen when books and films are confused with one another. Can you think of
-why this might happen?
-
-```{r}
-amazon %>%
-  mutate(pred = predict(model, newx = X, type = "class")) %>%
-  select(category, pred, train_id) %>%
-  table()
-```
-
-The code to look at the coefficients is slightly different here because this is
-a multinomial model rather than a binomial one. Each category has its own
-coefficients.
-
-```{r}
-temp <- coef(model, s = model$lambda[22])
-beta <- Reduce(cbind, temp)
-beta <- beta[apply(beta != 0, 1, any),]
-colnames(beta) <- names(temp)
-beta
-```
-
-You should see that the words that come out of the model match our intuition
-for what words would be associated with each product type.
-
-### POS tags
-
-Now, let's see what we can do by making use of the part of speech tags in the
-tokens data. To start, we can get a sense of the most common lemmas associated
-with each universal part of speech:
+Let's see some of the most frequent word lemmas in the data:
 
 ```{r}
 token %>%
-  group_by(upos, lemma) %>%
-  summarize(sm_count()) %>%
-  arrange(desc(count)) %>%
-  slice_head(n = 8) %>%
-  summarize(sm_paste(lemma))
-```
-Then, we can use these codes to filter the data to include only certain
-parts of speech in our model. For example, we can look at only verbs:
-
-```{r}
-X <- token %>%
-  filter(upos == "VERB") %>%
-  cnlp_utils_tf(doc_set = amazon$doc_id,
-                min_df = 0.001,
-                max_df = 0.5,
-                max_features = 10000)
-
-dim(X)
-```
-
-The model has significantly fewer variables now. We then train the data as
-before:
-
-```{r}
-X_train <- X[amazon$train_id == "train", ]
-y_train <- amazon$category[amazon$train_id == "train"]
-
-model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
-```
-
-How well does the model do in predicting the category of the product? It's
-okay, but not as good as the original model:
-
-```{r}
-amazon %>%
-  mutate(pred = predict(model, newx = X, type = "class")) %>%
-  group_by(train_id) %>%
-  summarize(class_rate = mean(category == pred))
-```
-
-But keep in mind that our goal is not to find the most predictive model. Rather,
-we want to use the predictive model to understand the data. Filtering on just
-verbs does just that. We can, for example, see what verbs as associated with
-each category:
-
-```{r}
-temp <- coef(model, s = model$lambda[14])
-beta <- Reduce(cbind, temp)
-beta <- beta[apply(beta != 0, 1, any),]
-colnames(beta) <- names(temp)
-beta
-```
-
-As with the first model matrix, most of these should seem reasonable to you
-based on the categories.
-
-### Dependencies
-
-Dependencies give relationships between words in a sentence. For example,
-they relate the subject and object of a sentence to a verb. Or, relate an
-adjective to the noun that it modifies. We will use these extensively when
-we get to stylometric analysis, but it is a good idea to start seeing how
-they can be used even in a simple classification analysis. For example,
-we can find which verbs are associated with sentences where the subject is
-"I":
-
-```{r}
-token %>%
-  left_join(
-    select(token, doc_id, sid, tid_source = tid, lemma_source = lemma),
-    by = c("doc_id", "sid", "tid_source")
-  ) %>%
-  filter(token == "I", relation == "nsubj") %>%
-  group_by(lemma_source) %>%
+  filter(upos == "X") %>%
+  group_by(lemma) %>%
   summarize(sm_count()) %>%
   arrange(desc(count))
 ```
 
-Likewise, we can use these verbs to build a model:
+These are all fairly common words or symbols that we would expect to be common
+in text messages.
+
+### Term frequency (TF) matrix
+
+Now, we want to create a model matrix from the detected lemmas. Unlike our
+first attempt that only included a few terms that we manually selected, here
+we will create counts for all of the terms that occur in the data. To do this,
+we use the function `cnlp_utils_tf`. It returns a matrix object with one row
+for each document and only column for each unique lemma in the data. We pass
+the set of documents in order to make sure that the rows of X line up with the
+rows of spam (there can be issues, for example, if we filter the tokens in a
+way that causes a document to have no tokens at all).
 
 ```{r}
-X <- token %>%
-  left_join(select(token, doc_id, sid, tid_source = tid, lemma_source = lemma),
-            by = c("doc_id", "sid", "tid_source")) %>%
-  filter(token == "I", relation == "nsubj") %>%
-  cnlp_utils_tf(doc_set = amazon$doc_id,
-                min_df = 0.001,
-                max_df = 1,
-                max_features = 10000,
-                token_var = "lemma_source")
-
+X <- cnlp_utils_tf(token, doc_set = spam$doc_id)
 dim(X)
 ```
 
-Fitting it as before:
+Here, we have 1276 rows (the same as the `spam` data) and 4489 columns (one for
+each unique token). The matrix X is called a *term frequency* matrix; it
+provides the counts of how often each term occurs in each document. To
+understand the matrix, let's look at the first few rows and columns:
 
 ```{r}
-X_train <- X[amazon$train_id == "train", ]
-y_train <- amazon$category[amazon$train_id == "train"]
-
-model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
+X[1:10, 1:24]
 ```
 
-As you might expect, this model is not nearly as predictive as it ignores
-many of the useful features in the review. However, given it's limited
-information, it does almost twice as well as random guessing would:
+The matrix here is slightly different than those that we build with the
+`model.matrix` function; it is a *sparse* matrix, a special way of storing a
+matrix that has a lot of zeros. The zeros as given as dots in the print out.
+Reading the matrix, we see that the first two documents do not use exclamation
+marks, but the third one does. The first document uses three periods, the
+second uses none, and the third uses four.
+
+We can create a training data from the term frequency matrix using the same
+syntax as with a dense matrix. We will create the training response by
+directly grabbing the variable rom the `spam` data.
 
 ```{r}
-amazon %>%
+X_train <- X[spam$train_id == "train", ]
+y_train <- spam$class[spam$train_id == "train"]
+```
+
+And now we can use this data to build a model.
+
+### Penalized regression for text classification
+
+Our model matrix has a very large number of columns. It has, in fact, more
+columns that rows! It is not possible to use a standard linear or logistic
+regression model. However, penalized regression is perfect: it will
+automatically the best variables to use in the model.
+
+The **glmnet** package is able to work directly to sparse matrices, so we can
+run the model just as we did in the previous notebook.
+
+```{r, warning=FALSE}
+model <- cv.glmnet(
+  X_train, y_train, alpha = 0.2, family = "multinomial", nfolds = 3
+)
+```
+
+How well does the model fit the data? It perfectly fits the training data and
+does much better than the previous model with the validation data:
+
+```{r}
+spam %>%
   mutate(pred = predict(model, newx = X, type = "class")) %>%
   group_by(train_id) %>%
-  summarize(class_rate = mean(category == pred))
+  summarize(class_rate = mean(class == pred))
 ```
 
-And as with the verb-based model, it is really the coefficents that are the
-most interesting for us to work with:
+Perhaps more importantly for us, we can use the selected coefficients to find
+those terms most associated with spam and ham:
 
 ```{r}
-temp <- coef(model, s = model$lambda[14])
+temp <- coef(model, s = model$lambda[16])
 beta <- Reduce(cbind, temp)
 beta <- beta[apply(beta != 0, 1, any),]
 colnames(beta) <- names(temp)
 beta
 ```
 
-Do these also match your intuition for what verbs would be associated with
-each product?
+There is only one lemma associated with ham: "i" (the personal pronoun I). The
+other terms are all associated with spam. Some seem intuitive, such as "£" and
+"free", others are at first a bit less clear. We will see in the final sections
+several different ways of investigating the model and what it tells us about
+our data.
+
+### Key Words in Context
+
+The key word in context (KWiC) method is used in corpus linguistics to
+understand how certain terms are used in a corpus. This can be useful for
+understanding why certain terms pop up in a predictive model. To run a KWiC
+analysis we will use the `sm_kwic` function. Let's try to figure out why the
+term "to" is associated with spam:
+
+```{r}
+sm_kwic("to", spam$text, n = 20)
+```
+
+And we see that it is often used to describe where some message should be
+sent to. We can do the same with the term "or":
+
+```{r}
+sm_kwic("or", spam$text, n = 20)
+```
+
+And we see that it is used in a few different common constructions such as
+"or stop" or to describe different types of prizes available in a contest.
+
+### Max probability
+
+Another way of investigating a model is to see the documents that have the
+strongest prediction values. That is, those messages that the model thinks
+are most and least likely to be spam. Here are the messages most likely to
+be spam:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "response")) %>%
+  arrange(desc(pred)) %>%
+  slice_head(n = 10) %>%
+  use_series(text)
+```
+
+And these are the messages most likely to be ham:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "response")) %>%
+  arrange(pred) %>%
+  slice_head(n = 10) %>%
+  use_series(text)
+```
+
+Can you identify any interesting patterns here?
+
+### Negative Examples
+
+Similarly, we can try to look at "negative examples", those messages that are
+incorrectly predicted by the model. Here are the negative examples that are
+ham but classified as spam:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  filter(pred != class) %>%
+  filter(class == 0) %>%
+  use_series(text)
+```
+
+Do you notice anything interesting here? How about with the spam messages
+incorrectly classified as ham:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  filter(pred != class) %>%
+  filter(class == 1) %>%
+  use_series(text)
+```
+
+In this case there were few enough negative examples to look at them all. In the
+case of more difficult prediction tasks, you may want to look at only those
+negative examples that have a relatively extreme predicted probability.

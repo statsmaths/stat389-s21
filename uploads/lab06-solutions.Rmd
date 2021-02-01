@@ -18,313 +18,227 @@ options(sparse.colnames = TRUE)
 options(dplyr.summarise.inform = FALSE)
 ```
 
-# U.S. Authors
+# Email Spam
 
-In this lab we will look at a corpus of short snippets of novels from three
-U.S. authors. The data have already been split into a training and validation
-set. All we need to do is read it in:
+In this lab we will look at a different spam data set, this time using email
+rather than SMS records. Note that we do not want to print out the entire
+data set because RStudio has strange trouble printing large data sets that
+contain lengthy text fields.
 
 ```{r, message=FALSE}
 set.seed(1)
 
-us <- read_csv(file.path("data", "stylo_us.csv"))
-head(us)
+email <- read_csv(file.path("data", "spam_email.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+head(email)
 ```
 
-I have also already run the corpus through the spaCy annotation engine and
-saved the tokens data set for you to work with in R. You can read it in with
-the following:
+## Building Manual Features
 
-```{r, message=FALSE}
-token <- read_csv(file.path("data", "stylo_us_token.csv.gz"))
+To start, let's try to build manual features to predict whether a message is
+spam. Build a logistic regression model using the length of the message and
+3-5 hand constructed features (specific punctuation marks or words). Print
+out a summary of the model.
+
+```{r, warning = FALSE, question-01}
+model <- email %>%
+  mutate(
+    length = stri_length(text),
+    num_exclam = stri_count(text, fixed = "!"),
+    num_quest = stri_count(text, fixed = "?"),
+    num_commas = stri_count(text, fixed = ",")
+  ) %>%
+  filter(train_id == "train") %>%
+  glm(
+    class ~ length + num_exclam + num_quest + num_commas,
+    data = .,
+    family = binomial()
+  )
+
+summary(model)
+```
+
+According to the model, all other things being equal, are longer messages more
+or less likely to be spam? **Answer**: In my model, longer messages are more
+likely to not be spam.
+
+Now, compute the classification rate on the training and validation sets:
+
+```{r, question-02}
+email %>%
+  mutate(
+    length = stri_length(text),
+    num_exclam = stri_count(text, fixed = "!"),
+    num_quest = stri_count(text, fixed = "?"),
+    num_commas = stri_count(text, fixed = ",")
+  ) %>%
+  mutate(pred = predict(model, newdata = ., type = "response")) %>%
+  mutate(class_pred = (pred > 0.5)) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(class_pred == class))
+```
+
+Take note of how this compares to the classification rate in the notes from
+today.
+
+## Building Automatic Features
+
+Now, we will produce a tokenized version of the data set. The code below prints
+out progress every 500 documents. As with the `email` data set, we will try to
+avoid printing out the entire `token` table.
+
+```{r, warning=FALSE}
+cnlp_init_stringi()
+token <- cnlp_annotate(email, verbose = 500)$token
 head(token)
 ```
 
-## Understanding the data
-
-Before jumping into any other coding, use the three blocks below to randomly
-sample (using `sample_n`) 5 text documents from each of the three authors
-in the data: "Hawthorne", "Poe", "Twain".
-
-```{r, question-01}
-us %>%
-  filter(author == "Hawthorne") %>%
-  sample_n(size = 5) %>%
-  use_series("text")
-```
-
-```{r, question-02}
-us %>%
-  filter(author == "Poe") %>%
-  sample_n(size = 5) %>%
-  use_series("text")
-```
+Determine the most common non-punctuation marks in the data set by counting the
+occurrences of every lemma and sorting them in descending order.
 
 ```{r, question-03}
-us %>%
-  filter(author == "Twain") %>%
-  sample_n(size = 5) %>%
-  use_series("text")
+token %>%
+  filter(upos == "X") %>%
+  group_by(lemma) %>%
+  summarize(sm_count()) %>%
+  arrange(desc(count))
 ```
 
-You can see that the documents are just short snippets from various novels.
+Do you notice that some punctuation marks are, in fact, in this data set? This
+is because the stringi parser is not very accurate. We will see a better one
+next class.
 
-## Building a predictive model
-
-Now, build a TF matrix using the parsed data and all of the available tokens.
-I recommend for now setting the minimum threshold for including a term to 0.001
-and the maximum to be 0.5. Print out the dimension of the data:
+Now, building a TF matrix from the data set using the default parameters for the
+`cnlp_utils_tf` function. Also, create a training version of the matrix and a
+training response vector. Print out the dimension of the data matrix.
 
 ```{r, question-04}
-X <- token %>%
-  cnlp_utils_tf(doc_set = us$doc_id,
-                min_df = 0.001,
-                max_df = 0.5,
-                max_features = 10000)
-
-X_train <- X[us$train_id == "train", ]
-y_train <- us$author[us$train_id == "train"]
-
+X <- cnlp_utils_tf(token, doc_set = email$doc_id)
+X_train <- X[email$train_id == "train", ]
+y_train <- email$class[email$train_id == "train"]
 dim(X)
 ```
 
-Now, fit an elastic net model using this data with alpha equal to 0.9 and three
-folds.
+How many features have been created? **Answer**: 10000
 
-```{r, warning = FALSE, question-05}
+Now, create an elastic net model using three folds, alpha 0.9, and the TF
+matrix created above.
+
+```{r, question-05}
 model <- cv.glmnet(
-  X_train, y_train, alpha = 0.9, nfolds = 3, family = "multinomial"
+  X_train, y_train, alpha = 0.9, family = "multinomial", nfolds = 3
 )
 ```
 
-And then compute the classification rate on the training and validation data:
+Using this model, compute the classification rate for the training and
+validation sets in the `email` data.
 
 ```{r, question-06}
-us %>%
+email %>%
   mutate(pred = predict(model, newx = X, type = "class")) %>%
   group_by(train_id) %>%
-  summarize(class_rate = mean(author == pred))
+  summarize(class_rate = mean(class == pred))
 ```
 
-Next, produce a confusion matrix:
+How does this compare with the hand-constructed features? **Answer**: The model
+has an almost perfect fit for the training set and a very high accuracy for the
+validation data (nearly 97%).
+
+Look at the coefficents from the model, selecting a lambda so that there are
+about twelve selected variables.
 
 ```{r, question-07}
-us %>%
-  mutate(pred = predict(model, newx = X, type = "class")) %>%
-  select(author, pred, train_id) %>%
-  table()
-```
-
-You should find that the model almost perfects predicts the training data but
-performs much worse on the validation data. What is going on here? Let's look
-at the terms that are the most powerful in the penalized regression model.
-Below, display the coefficients by picking a lambda that yields around 20 terms:
-
-```{r, question-08}
-temp <- coef(model, s = model$lambda[15])
+temp <- coef(model, s = model$lambda[18])
 beta <- Reduce(cbind, temp)
 beta <- beta[apply(beta != 0, 1, any),]
 colnames(beta) <- names(temp)
 beta
 ```
 
-What type of terms show up here? **Answer** I found two different types: the
-first are common function words and punctuation marks. The second are proper
-names of characters.
+Do these features and signs make sense / seem reasonable to you? Are any
+surprising? **Answer**: Answers vary.
 
-The difficulty with this task is that the data have not been split into training
-and validation at random. Rather, each novel has been associated with the entire
-training or validation data set. This means that a character might be in a novel
-that is in many fragments from one one (such as "Tom" from Mark Twain or
-"Clifford" from Nathaniel Hawthorne), but that this will not be useful in the
-validation data.
+## Key Words in Context (KWiC)
 
-## POS Filtering
+In the four code blocks below, use the `sm_kwic` function to look at 20
+occurrences of the more surprising/interesting terms you found above.
 
-In the code block below, create a TF matrix of just lemmas that are adjectives
-("ADJ"). This time do not cap the maximum proportion of documents that can
-contain a token. Fit an elastic net as above and print out the classification
-rate on the training and validation data.
-
-```{r, warning=FALSE, question-09}
-X <- token %>%
-  filter(upos == "ADJ") %>%
-  cnlp_utils_tf(doc_set = us$doc_id,
-                min_df = 0.001,
-                max_df = 1,
-                max_features = 10000)
-
-X_train <- X[us$train_id == "train", ]
-y_train <- us$author[us$train_id == "train"]
-
-model <- cv.glmnet(
-  X_train, y_train, alpha = 0.9, nfolds = 3, family = "multinomial"
-)
-
-us %>%
-  mutate(pred = predict(model, newx = X, type = "class")) %>%
-  group_by(train_id) %>%
-  summarize(class_rate = mean(author == pred))
+```{r, question-08}
+sm_kwic("mailman", email$text, n = 20)
 ```
 
-Repeat with the "VERB" lemmas:
-
-```{r, warning=FALSE, question-10}
-X <- token %>%
-  filter(upos == "VERB") %>%
-  cnlp_utils_tf(doc_set = us$doc_id,
-                min_df = 0.001,
-                max_df = 1,
-                max_features = 10000)
-
-X_train <- X[us$train_id == "train", ]
-y_train <- us$author[us$train_id == "train"]
-
-model <- cv.glmnet(
-  X_train, y_train, alpha = 0.9, nfolds = 3, family = "multinomial"
-)
-
-us %>%
-  mutate(pred = predict(model, newx = X, type = "class")) %>%
-  group_by(train_id) %>%
-  summarize(class_rate = mean(author == pred))
+```{r, question-09}
+sm_kwic("wrote", email$text, n = 20)
 ```
 
-And once again with "PUNCT" marks:
+```{r, question-10}
+sm_kwic("removed", email$text, n = 20)
+```
 
 ```{r, question-11}
-X <- token %>%
-  filter(upos == "PUNCT") %>%
-  cnlp_utils_tf(doc_set = us$doc_id,
-                min_df = 0.001,
-                max_df = 1,
-                max_features = 10000)
-
-X_train <- X[us$train_id == "train", ]
-y_train <- us$author[us$train_id == "train"]
-
-model <- cv.glmnet(
-  X_train, y_train, alpha = 0.9, nfolds = 3, family = "multinomial"
-)
-
-us %>%
-  mutate(pred = predict(model, newx = X, type = "class")) %>%
-  group_by(train_id) %>%
-  summarize(class_rate = mean(author == pred))
+sm_kwic("date", email$text, n = 20)
 ```
 
-How would you compare the error rates of these models? **Answer** Answers will
-vary.
+Does the KWiC method help explain why some of these are so predictive and/or
+why they are associated with a particular category? **Answer**: Answers vary.
 
-## Exploring the NLP data
+## Negative Examples
 
-For the remainder of the lab, we are going to use the data set to get familiar
-with the features that are available for building machine learning models. You
-may be inclined to rush, but try to take your own time here. It will pay off
-very soon.
+In the code block below, print out the negative examples that are classified
+as spam but are actually ham. You might find it useful to add this line into
+the pipe to avoid printing very long messages:
 
-### Lemmas
+  `mutate(text = stri_sub(text, 1, 250)) %>%`
 
-Let's start by seeing how the NLP engine has lemmatized the tokens. Filter
-the tokens to just those that have a lemma equal to "sit". Group by the
-universal part of speech and token, count the number of occurances, and
-arrange in descending order of the count. Take note of all of the tokens that
-get turned into the lemma "sit".
 
 ```{r, question-12}
-token %>%
-  filter(lemma == "have") %>%
-  group_by(upos, token) %>%
-  summarize(sm_count()) %>%
-  arrange(desc(count))
+email %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  filter(pred != class) %>%
+  filter(class == 0) %>%
+  mutate(text = stri_sub(text, 1, 250)) %>%
+  use_series(text)
 ```
 
-Repeat for the more dynamic verb "have". Notice the token "'ve" coming from
-the contraction "you've" and "'d" from "you'd", "he'd", or "she'd".
+Can you identify why these were incorrectly classified? **Answer**: Answers vary.
+
+And now print out the negative examples that are classified as ham but are
+actually spam.
 
 ```{r, question-13}
-token %>%
-  filter(lemma == "sit") %>%
-  group_by(upos, token) %>%
-  summarize(sm_count()) %>%
-  arrange(desc(count))
+email %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  filter(pred != class) %>%
+  filter(class == 1) %>%
+  mutate(text = stri_sub(text, 1, 250)) %>%
+  use_series(text)
 ```
 
-Let's see what happens to a noun. Repeat the process for the term "bird":
+Can you identify why these were incorrectly classified? **Answer**: Answers vary.
+
+## Extreme Probabilities
+
+In the two blocks below, print out the emails that have the highest and lowest
+predicted probabilities. As in the previous code blocks, consider taking just
+the first 250 characters of the message.
 
 ```{r, question-14}
-token %>%
-  filter(lemma == "bird") %>%
-  group_by(upos, token) %>%
-  summarize(sm_count()) %>%
-  arrange(desc(count))
+email %>%
+  mutate(pred = predict(model, newx = X, type = "response")) %>%
+  arrange(desc(pred)) %>%
+  slice_head(n = 10) %>%
+  mutate(text = stri_sub(text, 1, 250)) %>%
+  use_series(text)
 ```
-
-Notice that it includes the singular and plural form of the word.
-
-Finally, do the same with the lemma "-PRON-".
 
 ```{r, question-15}
-token %>%
-  filter(lemma == "-PRON-") %>%
-  group_by(upos, token) %>%
-  summarize(sm_count()) %>%
-  arrange(desc(count))
+email %>%
+  mutate(pred = predict(model, newx = X, type = "response")) %>%
+  arrange(pred) %>%
+  slice_head(n = 10) %>%
+  mutate(text = stri_sub(text, 1, 250)) %>%
+  use_series(text)
 ```
 
-You should notice that spaCy has turned all pronouns into a generic lemma
-"-PRON-". This is often not idea and something that we will sometimes want
-to adjust before creating a model.
-
-### XPOS Tags
-
-In the notes for today, we saw the top lemmas associated with each UPOS tag.
-Repeat the process here with the `xpos` tags and the tokens (rather than
-lemmas). It is probably useful to group by both the `upos` and `xpos` tags
-(`group_by(upos, xpos, token)`).
-
-```{r, question-16}
-token %>%
-  group_by(upos, xpos, token) %>%
-  summarize(sm_count()) %>%
-  arrange(desc(count)) %>%
-  slice_head(n = 8) %>%
-  summarize(sm_paste(token)) %>%
-  rmarkdown::paged_table()       # just for the notes to make the data viewable
-```
-
-Go through the list and try to understand what each of the tags captures. Use
-the spaCy reference or ask me to explain any that you are having trouble with.
-
-## Relations
-
-As described in the notes. Relations give links between words in a sentence
-describing specific grammatical connections. Here are the most common relations
-in the data set:
-
-```{r, question-17}
-token %>%
-  group_by(relation) %>%
-  summarize(sm_count()) %>%
-  arrange(desc(count))
-```
-
-And here is the code to identify several sentences that use the "nsubj" tag
-exactly once. I will save it as a temporary variable so that you can look at in
-the data viewer if you prefer.
-
-```{r, question-18}
-temp <- token %>%
-  group_by(doc_id, sid) %>%
-  filter(sum(relation == "pcomp") == 1) %>%
-  filter(max(tid) < 20) %>%
-  ungroup() %>%
-  select(sid, tid, token, upos, xpos, tid_source, relation) %>%
-  slice_head(n = 100)
-temp
-```
-
-Start by looking at the results above and understanding the "nsubj" tag and
-what it does. Then modify the code and look at these tags: "det", "advmod",
-"amod", "conj", "neg", "prep", and "compound". As above, use the spaCy guide
-to help with any that you find difficult to understand.
+Do these help further explain how the classification algorithm is working? In
+what ways? **Answer**: Answers vary.

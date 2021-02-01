@@ -1,9 +1,11 @@
 lab01.Rmd
 lab02.Rmd
 lab03.Rmd
+lab04.Rmd
 note-style.css
 data/ca_house_price.csv
 data/diamonds.csv
 data/mpg.csv
 data/flights_small.csv
+data/tract_median_income.csv
 

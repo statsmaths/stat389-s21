@@ -1,5 +1,5 @@
 ---
-title: "Notebook 12: Latent Dirchlet Allocation (LDA)"
+title: "Notebook 12: Documents as Vectors"
 output:
   html_document:
     theme: cosmo
@@ -13,245 +13,345 @@ library(forcats)
 library(ggrepel)
 library(smodels)
 library(cleanNLP)
-library(topicmodels)
-library(magrittr)
+library(Matrix)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
 
-## Creating a Corpus of Wikipedia Documents
+## Food Data
 
-For Project 4, unlike the other projects, you will be constructing your own
-corpus of documents to work with. These documents will come from the text of
-Wikipedia articles. The functions needed to do this can be loaded by reading
-in the `wiki.R` script:
-
-```{r}
-source("wiki.R")
-```
-
-The function `wiki_get_pages` takes a vector of page names, queries the
-MediaWiki API, and returns a data frame with the HTML parsed version of
-the page, as well as information about all internal links included in the
-page. Here, we will use it to grab the pages "Coffee" and "Tea". Note that
-the function requires that you set the language of Wikipedia that you are
-interested in grabbing data from.
-
-```{r}
-pages <- wiki_get_pages(c("Coffee", "Tea"), lang = "en")
-pages
-```
-
-The functions are smart and create a local cache of files that avoids having
-to query the API over and over again.
-
-Now, we will use the function `wiki_expand_pages` to grab all of the pages
-that are linked to from the pages in the data frame `pages`. That is, returning
-data for all pages that are linked to from the Coffee or Tea pages. Be careful
-with this data set! RStudio has trouble displaying the raw text in the resulting
-data frame and will likely crash if you try to print out all of the columns or
-open the data in the view finder. It's better to just print out the page and
-lang variables
-
-```{r}
-exp_pages <- wiki_expand_pages(pages)
-select(exp_pages, page, lang)
-```
-
-We now have a corpus of 1131 pages. Finally, we will use the function
-`wiki_get_pages_text` to extract the raw text from the Wikipedia files.
-This requires parsing all of the HTML records and can take a minute or
-two to finish running, but note that it does not grab any additional data
-from the MediaWiki API. As with the previous data set, do not try to print
-out all of the columns of the data in R.
-
-```{r}
-wiki <- wiki_get_pages_text(exp_pages)
-select(wiki, page, sec_num, section)
-```
-
-Notice that the corpus now contains over 41 thousand documents because it
-extracts each paragraph as an individual document. It also includes the
-section number and title associated with each page. These can be useful for
-many analyses, but we will not make use of them right now. We can instead
-roll-up the pages so that each row of the data set contains only one page.
-
-```{r}
-wiki <- tapply(wiki$text, wiki$page, paste, collapse = " ")
-wiki <- tibble(doc_id = names(wiki), text = as.character(wiki))
-dim(wiki)
-```
-
-Finally, we need to run the NLP annotation engine over this data set. Here is
-the code to run and save the results using the **udpipe** backend:
-
-```{r, eval=FALSE, message=FALSE, warning=FALSE}
-cnlp_init_udpipe("english")
-anno <- cnlp_annotate(wiki)$token
-
-write_csv(wiki, file.path("data", "wiki_coffee_tea.csv"))
-write_csv(token, file.path("data", "wiki_coffee_tea_token.csv.gz"))
-```
-
-The saved results can then be read-in and used without having to re-create the
-data set. We will use this data in several of our upcoming notebooks.
-
-```{r, eval=FALSE, echo=FALSE}
-library(reticulate)
-use_virtualenv("/Users/admin/gh/stat389-s21/env", required = TRUE)
-cnlp_init_spacy("en_core_web_sm")
-anno <- cnlp_annotate(wiki)
-
-token <- anno$token
-entity <- anno$entity
-
-write_csv(wiki, file.path("data", "wiki_coffee_tea.csv"))
-write_csv(token, file.path("data", "wiki_coffee_tea_token.csv.gz"))
-write_csv(entity, file.path("data", "wiki_coffee_tea_entity.csv.gz"))
-```
-
-## Latent Dirchlet Allocation
-
-We will now proceed to the methodological topic for today. For consistency,
-let's read back in the Wikipedia data and tokens files.
+Today we make a shift towards a different type of textual analysis. So far we
+have been mostly interested in a large collection of texts with the goal of
+associating features in predicting some response variable. Now, we start to
+consider the case where we are interested in understanding specific documents
+in a corpus. Typically this will involve a smaller collection of longer
+documents. To illustrate this, we will look at a data set of Wikipedia pages
+corresponding to 61 food items (the same as in the example data from 289, if you
+were in that class). We will load the corpus and the associated tokens. This
+time, we will not worry about spliting the data into training and validation
+sets.
 
 ```{r, message=FALSE}
-wiki <- read_csv(file.path("data", "wiki_coffee_tea.csv"))
-token <- read_csv(file.path("data", "wiki_coffee_tea_token.csv.gz"))
+food <- read_csv("data/food_page.csv")
+token <- read_csv("data/food_page_token.csv.gz")
+
+food
 ```
 
-Today we are going to investigate a method for *topic modeling*. This is an
-unsupervised task that seeks to identify topics within a corpus of text. What
-exactly is a topic? Mathematically speaking, it is usually defined as a
-probability distribution over a collection of words. Words that have a high
-probability within a topic tend to classify the topics themes in a colloquial
-sense. For example, a topic that captures the idea of baseball would have high
-probabilities on words such as "base", "player", "strike", "umpire", "team",
-and so forth.
+Notice that the document ids are a bit more informative that usual, and indicate
+the name of the Wikipedia page in question.
 
-We will be use a model today called Latent Dirchlet Allocation, or more commonly
-LDA. Given a fixed number of topics and fixed set of words (called a *lexicon*),
-LDA assumes that documents consist of a random collection of words
-constructed according to the following model:
+## TF-IDF
 
-1. Each document is randomly partitioned into topics. For example, one document
-may be 20% in Topic A, 70% in Topic B, and 1% in the remaining 10 topics.
-2. Each topic is similarly assigned as a probability distribution of all the
-available words.
-3. When choosing words to create a document, pick a topic at random
-proportional to the topic distribution of the document, and then pick a word
-proportional to the chosen topic.
-4. The number of words in each document is assumed to be fixed, and there is
-assumed to be no relationship between the words in each document.
-
-This model is a great example of the adage that "all models are wrong, but
-some are useful". Clearly, this is not how documents are constructed, and
-words are not independent of one another. However, the approximation is close
-enough to produce a useful abstraction for detecting themes within a corpus of
-textual documents.
-
-You will notice that the description above is in some ways backwards from
-reality. It assumes that we know the distribution of the topics over the words
-and documents but do not know what words are present in the documents. In fact,
-we know the words but not the topics! This is an example of a Bayesian model.
-If we wrote down the assumptions rigorously, we could invert the probabilities
-using Bayes' Theorem. That is, instead of knowing the probability of the
-documents given the topics, we can determine the probability of the topics given
-the documents. It is not possible to do this analytically, however, and a
-simulation method is needed to figure out what distribution of topics over the
-words and documents is most likely to have produced the observed data.
-
-As a final note about the method, the name comes from the standard distribution
-used to determine the topics (the Dirichlet distribution) and the fact that the
-topics themselves are never observed (that is, the are *latent*).
-
-Now, let's actually compute an LDA topic model. The first step in creating a
-topic model is to compute a TF matrix. I tend to use only nouns, adjectives and
-adverbs for this task (verbs are okay too, if you would like).
+We have already made extensive use of the term frequency matrix in our
+predictive models. Here, we are going to consider a variation of this data
+structure that includes some scaling of the values that can be useful for
+exploring a corpus in a different way. It will be useful to have a way to
+work with the term frequencies in a data frame, with one value in each
+row, as follows:
 
 ```{r}
-X <- token %>%
-  filter(upos %in% c("NOUN", "ADJ", "ADV")) %>%
-  cnlp_utils_tf(min_df = 0.001, max_df = 0.5, doc_set = wiki$doc_id)
+token %>%
+  sm_text_tfidf(token_var = "lemma", min_df = 0, max_df = 1)
 ```
 
-Next, we use the `sm_lda_topics` function. It requires passing the TF matrix
-as well as selecting the number of topics. Because this requires a simulation
-method, running the topic model can take a few minutes to complete. The results
-should be consistent from run to run because I have set the random seed inside
-of the implementation. The output contains two components, which we will save
-as individual data frames.
+Note that regardless of what variable is used as `token_var`, the column
+containing the thing being counted will be called `token`. The count variable is
+stored in a column called `tf`, which stands for "term frequency". There is
+another term called `tfidf` (TF-IDF), the term frequency-inverse document
+frequency score. It takes a (scaled version) of the term frequency and divides
+by (a scaled) proportion of documents that use the term. Mathematically, if
+`tf` are the number of times a term is used in a document and `df` are the
+proportion of documents that use the term at least once, the TF-IDF score can
+be computed as:
+
+$$ \text{tfidf} = \frac{(1 + log_2(\text{tf}))}{log_2(\text{df})} $$
+
+The score gives a measurement of how important a term is in describing a
+document in the context of the other documents. Note that this is a popular
+choice for the scaling functions, but they are not universal and other software
+way use different choices.
+
+We can use TF-IDF to try to measure the most important words in each document.
+Here, we filter out particularly rare terms that occur in less than 10% of the
+documents, and then find the 8 nouns that have the highest value of `tfidf` for
+each document:
 
 ```{r}
-topic_model <- sm_lda_topics(X, num_topics = 16)
-topic_docs <- topic_model$docs
-topic_terms <- topic_model$terms
-```
-
-The first data frame provides the probability distributions of the documents.
-It tells us own much weight each document receives from each topic.
-
-```{r}
-topic_docs
-```
-
-Looking at the documents with the highest probability for each topic begins to
-show what the LDA algorithm has found in each topic. Can you categorize what
-themes some of these topics capture?
-
-```{r}
-topic_docs %>%
-  arrange(topic, desc(prob)) %>%
-  group_by(topic) %>%
-  slice_head(n = 10) %>%
-  group_by(topic) %>%
-  mutate(doc_id = paste(topic, doc_id, sep = " => ")) %>%
-  use_series(doc_id)
-```
-
-Similarly, the terms data frame gives the probability distribution of the terms.
-These probabilities can be quite small; rather than giving then on a raw scale,
-the function returns the logarithm of the probability in the column named
-`beta` (for this reason, these values are all negative).
-
-```{r}
-topic_terms
-```
-
-Looking at words for each topic gives another view for understanding the
-detected topics. In many applications, we do not have useful titles of
-the documents, and using the word distributions is the only automatic way of
-describing each topic.
-
-```{r}
-topic_terms %>%
-  arrange(topic, desc(beta)) %>%
-  group_by(topic) %>%
-  slice_head(n = 10) %>%
-  group_by(topic) %>%
+token %>%
+  filter(upos == "NOUN") %>%
+  sm_text_tfidf(min_df = 0.1) %>%
+  arrange(desc(tfidf)) %>%
+  group_by(doc_id) %>%
+  slice(1:8) %>%
   summarize(sm_paste(token))
 ```
 
-How do these match up with the topics that you identified by the document
-names?
+Do these capture words that best describe each page? How would you expect the
+top terms to change if we applied it to a larger collection of Wikipedia pages
+that included many non-food related articles?
 
-## Visualizing Topics Models
+## Documents as Vectors: Illustration
+
+This section illustrates a concept that will be very useful in the final two
+sections of this chapter. Note, however, that there is generally no need to
+include this in your own analysis of textual data.
+
+The TF-IDF data set is an example of a long-format data set. Conceptually, we
+can think about the idea of converting this into a wide-format. Here, each row
+would correspond to a document; variables would exist for each unique token,
+giving counts corresponding to each document. This object can get quite large,
+but writing the code is relatively straightforward using the techniques. Here,
+we will filter to include only two lemmas, "animal" and "food", and pivot the
+TF-IDF data set into a wide format.
 
 ```{r}
-source("topic.R")
+token %>%
+  sm_text_tfidf() %>%
+  filter(token %in% c("animal", "food")) %>%
+  select(doc_id, token, tf) %>%
+  pivot_wider(
+    names_from = "token",
+    values_from = "tf",
+    names_prefix = "lemma_",
+    values_fill = list("tf" = 0)
+  )
 ```
 
+Using just these two columns, we can plot a set of pages with `lemma_food` on
+the x-axis and `lemma_animal`. It will be useful to think of these are vectors
+starting at the origin, rather than points floating in space.
 
 ```{r}
-topic_json <- topics_create_json(topic_docs, topic_terms, wiki, truncate = 1000L)
-write_json(topic_json, "wiki-topics.json")
+token %>%
+  sm_text_tfidf() %>%
+  filter(token %in% c("animal", "food")) %>%
+  select(doc_id, token, tf) %>%
+  pivot_wider(
+    names_from = "token",
+    values_from = "tf",
+    names_prefix = "lemma_",
+    values_fill = list("tf" = 0)
+  )  %>% filter(
+    doc_id %in% c("Apple", "Beef", "Chicken", "Potato", "Milk", "Lamb", "Cheese")
+  ) %>%
+  ggplot() +
+    geom_text(
+      aes(x = lemma_food, y = lemma_animal, label = doc_id),
+      nudge_x = 0.8,
+      nudge_y = 0.8
+    ) +
+    geom_segment(
+      aes(x = 0, y = 0, xend = lemma_food, yend = lemma_animal),
+      arrow = arrow(length = unit(0.3,"cm"))
+    )
 ```
 
+What you should notice from this diagram is that these two words do a good job
+of distinguishing the various pages. Beef and Lamb refer to animal food
+products, and therefore have the highest usage of the lemma "animal". Potato
+and Apple are not related to animals are all, and only use the lemma "food".
+Milk and Cheese are food derived from animal products and sit in the middle of
+the plot. Chicken is an animal, but its page focuses heavily on its culinary
+usage, and therefore it sits closer to the dairy products.
 
+The take-away from this illustration is that a wider-format of the term
+frequency values provides an interesting way of grouping and exploring the
+relationships between documents. Generally, we do not want to actually use
+the `pivot_wider` function because it is too slow and clunky to work with a
+data set that may have thousands of columns. Instead, we will use a different
+approach with allows us to think of documents as living in a high dimensional
+space without having to work with these large dimensional spaces directly.
 
+## Dimension Reduction
 
+Consider extending the illustration in the previous section to include a larger
+set of lemmas. While we do not have an easy way of plotting the concept, we can
+try to imagine each document as a an arrow from the origin to a point in a very
+high dimensional space (one dimension for each unique token in the term
+frequency dataset). In this section we will see a way of trying to work with
+this high-dimensional space.
 
+It was mentioned above that the `pivot_wider` function is not a good choice for
+making a wider version of a term frequency data set. A better choice is the
+function `cnlp_utils_tf`, provided by **cleanNLP**, which we have used
+extensively so far in this course.
 
+Principal component analysis is a common method for taking a high-dimensional
+data set and converting it into a smaller set of dimensions that capture many
+of the most interesting aspects of the higher dimensional space. The first
+principal components is defined as a direction in the high-dimensional space
+that captures the most variation in the inputs. The second component is a
+dimension perpendicular to the first that captures the highest amount of
+residual variance. Additional components are defined similarly. We can
+compute principal components from the "dgCMatrix" using the helper function
+`sm_tidy_pca`:
 
+```{r}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma") %>%
+  sm_tidy_pca(n = 2)
+```
+
+The specific mathematics behind the principal components is less important than
+how we interpret the output. Generally, went we plot the first 2 or 3 components
+together, we do not worry about the specific dimensions. Rather, we want to use
+the principal components to show relationships between documents based on
+clusters and other information. Here is a plot of our data set on the
+first two principal components:
+
+```{r, warning = FALSE}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma") %>%
+  sm_tidy_pca() %>%
+  ggplot(aes(x = v1, y = v2)) +
+    geom_point(color = "grey90") +
+    geom_text_repel(
+      aes(label = document),
+      show.legend = FALSE
+    ) +
+    theme_void()
+```
+
+Notice that the seafood and fruits cluster along different parts of the plot.
+The other food groups roughly cluster in the upper-left hand side of the plot,
+with vegetables closer to the fruits. The Duck page, an aquatic bird, is sit
+in-between the seafood and other meats. All of these capture general
+relationships we might expect given our knowledge of the pages and what they
+represent.
+
+Another method for reducing the dimension of our dataset is called UMAP
+(Uniform Manifold Approximation and Projection). It has a much more complex
+algorithm that is able to better spread the dataset uniformly over the plot
+region. We can run this algorithm using the function `sm_tidy_umap`:
+
+```{r, warning=FALSE}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma") %>%
+  sm_tidy_umap() %>%
+  ggplot(aes(x = v1, y = v2)) +
+    geom_point(color = "grey90") +
+    geom_text_repel(
+      aes(label = document),
+      show.legend = FALSE
+    ) +
+    theme_void()
+```
+
+As with the principal components, the exact dimensions are unimportant here,
+its the relationship between the documents that counts. Notice that the pages
+are less clumped together here, but also that the structures from the principal
+component analysis are not as clearly defined. The benefits of UMAP become more
+apparent with larger datasets.
+
+## Document Distance
+
+In the previous two sections we treated documents as being points in a
+high-dimensional space, and commented that our primary objective is
+understanding the relationships between the documents in this space. We can
+approach this question more directly by computing the distances between
+documents in the high-dimensional space. This can be done by using the
+`sm_tidy_distance` function applied to the TF-IDF matrix:
+
+```{r}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma") %>%
+  sm_tidy_distance()
+```
+
+The output gives the distance between every pair of documents. Self-pairs (the
+distance between Apple and Apple) are included to assist with other kinds of
+analysis. Using this output, we can join each page to its closest neighbor:
+
+```{r}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma") %>%
+  sm_tidy_distance() %>%
+  filter(document1 != document2) %>%
+  group_by(document1) %>%
+  arrange(distance) %>%
+  slice_head(n = 1) %>%
+  ungroup() %>%
+  arrange(distance)
+```
+
+Unfortunately, these links are largely not very intuitive Penne and
+Flounder, for example, do not have very much in common. The issue here is that
+the length of each document has a strong influence on the distance between
+points. Returning to our illustrative example with just two lemmas, notice
+that Potato is actually closer to Milk than it is to Apple. As an alternative,
+we can compute the *angle* between two vectors using the function
+`sm_tidy_angle_distance`.
+
+```{r}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma") %>%
+  sm_tidy_angle_distance() %>%
+  filter(document1 < document2) %>%
+  group_by(document1) %>%
+  arrange(distance) %>%
+  slice_head(n = 1) %>%
+  ungroup() %>%
+  arrange(distance)
+```
+
+These relationships seem much more as expected, linking for example Milk and
+Yogurt, Potato and Sweet Potato, Broccoli and Cauliflower. We will do more with
+these distances as a form of network analysis in a subsequent notebook.
+
+## Word Relationships
+
+In all of the preceding analyses, we have focused on the analysis of the
+document their usage of words. There are often multiple ways of widening a
+data set, each leading to different kinds of analysis. The term frequency
+data set is no different. We could widen the data set by treating each row as a
+term and each column as a document. It is possible to apply dimensionality
+reduction and distance metrics on this format as well in order to understand
+the relationships between words.
+
+The easiest way to produce a  matrix of the word relationships is by first
+using `cnlp_utils_tfidf` as before and then calling the function `t()`
+(transpose) to exchange the rows and columns. We will control the maximum
+number of features by setting `max_features` to 100 and only considering nouns.
+Here is the principal component analysis plot:
+
+```{r, warning=FALSE}
+token %>%
+  filter(upos == "NOUN") %>%
+  cnlp_utils_tfidf(
+    min_df = 0, max_df = 1, max_features = 100
+  ) %>%
+  t() %>%
+  sm_tidy_pca(item_name = "word") %>%
+  ggplot(aes(x = v1, y = v2)) +
+    geom_point(color = "grey90") +
+    geom_text_repel(
+      aes(label = word),
+      show.legend = FALSE
+    ) +
+    theme_void()
+```
+
+As well as the closest pairs of words (here we increase the number of words
+to 400):
+
+```{r, warning=FALSE}
+token %>%
+  filter(upos == "NOUN") %>%
+  cnlp_utils_tfidf(
+    min_df = 0, max_df = 1, max_features = 400
+  ) %>%
+  t() %>%
+  sm_tidy_angle_distance(item_name = "word") %>%
+  filter(word1 < word2) %>%
+  group_by(word1) %>%
+  arrange(distance) %>%
+  slice_head(n = 1) %>%
+  ungroup() %>%
+  arrange(distance)
+```
+
+Do these relationships seem reasonable to you? Do they tell you anything about
+the data or the usage of language within the data that you find surprising?

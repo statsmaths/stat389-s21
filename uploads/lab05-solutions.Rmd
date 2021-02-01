@@ -1,5 +1,5 @@
 ---
-title: "Lab 05"
+title: "Lab 04"
 output: html_document
 ---
 
@@ -18,136 +18,214 @@ options(sparse.colnames = TRUE)
 options(dplyr.summarise.inform = FALSE)
 ```
 
-# Email Spam
+# Chicago Crimes
 
-In this lab we will look at a different spam data set, this time using email
-rather than SMS records. Note that we do not want to print out the entire
-data set because RStudio has strange trouble printing large data sets that
-contain lengthy text fields.
+## Three Types
+
+Today's lab looks at a data set of reported crimes from the city of Chicago
+(if you were in my 289 class last semester, this should look familiar). Our
+prediction task is to predict the type of crime based on the features of the
+reported incident. To start, we'll look at a data set that has three crime
+types: "battery", "criminal damage", and "theft".
 
 ```{r, message=FALSE}
 set.seed(1)
 
-email <- read_csv(file.path("data", "spam_email.csv")) %>%
+chicago <- read_csv(file.path("data", "chi_crimes_3.csv")) %>%
   mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
-head(email)
+chicago
 ```
 
-## Building Manual Features
+Start by creating a model matrix, response vector, and training model matrix
+and response vector using all of the variables in the data set other than the
+`train_id`. This will be fairly large due to the large number of options for
+the variable `location`.
 
-To start, let's try to build manual features to predict whether a message is
-spam. Build a logistic regression model using the length of the message and
-3-5 hand constructed features (specific punctuation marks or words). Print
-out a summary of the model.
+```{r, question-01}
+mf <- model.frame(crime_type ~ . -1,
+                  data = select(chicago, -train_id))
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
 
-```{r, warning = FALSE, question-01}
-model <- email %>%
-  mutate(
-    length = stri_length(text),
-    num_exclam = stri_count(text, fixed = "!"),
-    num_quest = stri_count(text, fixed = "?"),
-    num_commas = stri_count(text, fixed = ",")
-  ) %>%
-  filter(train_id == "train") %>%
-  glm(
-    class ~ length + num_exclam + num_quest + num_commas,
-    data = .,
-    family = binomial()
-  )
-
-summary(model)
+X_train <- X[chicago$train_id == "train",]
+y_train <- y[chicago$train_id == "train"]
 ```
 
-According to the model, all other things being equal, are longer messages more
-or less likely to be spam? **Answer**: In my model, longer messages are more
-likely to not be spam.
-
-Now, compute the classification rate on the training and validation sets:
+Now, fit a cross-validated elastic net model using 3 folds and alpha equal to
+0.9.
 
 ```{r, question-02}
-email %>%
-  mutate(
-    length = stri_length(text),
-    num_exclam = stri_count(text, fixed = "!"),
-    num_quest = stri_count(text, fixed = "?"),
-    num_commas = stri_count(text, fixed = ",")
-  ) %>%
-  mutate(pred = predict(model, newdata = ., type = "response")) %>%
-  mutate(class_pred = (pred > 0.5)) %>%
-  group_by(train_id) %>%
-  summarize(class_rate = mean(class_pred == class))
-```
-
-Take note of how this compares to the classification rate in the notes from
-today.
-
-## Building Automatic Features
-
-Now, we will produce a tokenized version of the data set. The code below prints
-out progress every 500 documents. As with the `email` data set, we will try to
-avoid printing out the entire `token` table.
-
-```{r, warning=FALSE}
-cnlp_init_stringi()
-token <- cnlp_annotate(email, verbose = 500)$token
-head(token)
-```
-
-Determine the most common non-punctuation marks in the data set by counting the
-occurrences of every lemma and sorting them in descending order.
-
-```{r, question-03}
-token %>%
-  filter(upos == "X") %>%
-  group_by(lemma) %>%
-  summarize(sm_count()) %>%
-  arrange(desc(count))
-```
-
-Do you notice that some punctuation marks are, in fact, in this data set? This
-is because the stringi parser is not very accurate. We will see a better one
-next class.
-
-Now, building a TF matrix from the data set using the default parameters for the
-`cnlp_utils_tf` function. Also, create a training version of the matrix and a
-training response vector. Print out the dimension of the data matrix.
-
-```{r, question-04}
-X <- cnlp_utils_tf(token, doc_set = email$doc_id)
-X_train <- X[email$train_id == "train", ]
-y_train <- email$class[email$train_id == "train"]
-dim(X)
-```
-
-How many features have been created? **Answer**: 10000
-
-Now, create an elastic net model using three folds, alpha 0.9, and the TF
-matrix created above.
-
-```{r, question-05}
 model <- cv.glmnet(
   X_train, y_train, alpha = 0.9, family = "multinomial", nfolds = 3
 )
 ```
 
-Using this model, compute the classification rate for the training and
-validation sets in the `email` data.
+Next, plot the model using the `plot` function. Take note of the shape of the
+curve and the number of included variables (the numbers of the top of the plot)
+for each value of lambda.
 
-```{r, question-06}
-email %>%
-  mutate(pred = predict(model, newx = X, type = "class")) %>%
-  group_by(train_id) %>%
-  summarize(class_rate = mean(class == pred))
+```{r, question-03}
+plot(model)
 ```
 
-How does this compare with the hand-constructed features? **Answer**: The model
-has an almost perfect fit for the training set and a very high accuracy for the
-validation data (nearly 97%).
+And compute the classification rate for the data set.
 
-Look at the coefficents from the model, selecting a lambda so that there are
-about twelve selected variables.
+```{r, question-04}
+chicago %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(pred == crime_type))
+```
+
+How does this compare to random guessing (the data are balanced, with an equal
+number of crimes of each type)? **Answer**: Random guesing would give an error
+rate of 33%. Here, we have a rate of 58%. So, it still makes a lot of mistakes,
+but much better than guessing at random.
+
+Now, build a confusion matrix of the data.
+
+```{r, question-05}
+chicago %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  select(pred, crime_type, train_id) %>%
+  table()
+```
+
+Focusing on the validation set, are some crimes harder to distinguish than
+others? **Answer** Theft and criminal damage seem a bit harder to tell apart
+than it is distinguish them from battery.
+
+Now, print out the coefficients for a value of lambda that selects about a
+dozen variables (perhaps try the 21st value of lambda).
+
+```{r, question-06}
+temp <- coef(model, s = model$lambda[22])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
+
+Looking at the selected variables, what locations seem to be most associated
+with each type of crime? **Answer** Battery seems to take place in public places
+such as ALLEY, SIDEWALK, and PARKING LOT. Criminal damage takes place in stores.
+Theft is more likely in places of residence.
+
+Now, refit the model using alpha equal to 0.1.
 
 ```{r, question-07}
+model <- cv.glmnet(
+  X_train, y_train, alpha = 0.1, family = "multinomial", nfolds = 3
+)
+```
+
+Now, plot the model.
+
+```{r, question-08}
+plot(model)
+```
+
+Verify that more non-zero components are present at the minimul value of the
+CV-curve.
+
+## Twelve Types
+
+Let's now load another version of the crimes data, this time with 12 different
+categories. The data set is large, so in the interest of time we will only use
+5% of it for the training set to speed things along.
+
+```{r, message=FALSE}
+set.seed(1)
+
+chicago12 <- read_csv(file.path("data", "chi_crimes_12.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.05, "train", "valid"))
+chicago12
+```
+
+Again, build a model matrix and response vector with all of the variables other
+than `train_id`.
+
+```{r, question-09}
+mf <- model.frame(crime_type ~ . -1,
+                  data = select(chicago12, -train_id))
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
+
+X_train <- X[chicago12$train_id == "train",]
+y_train <- y[chicago12$train_id == "train"]
+```
+
+We are going to again fit a cross-validated elastic net model with alpha 0.9,
+and three folds. Add the option `trace.it = TRUE` to have a verbose print out
+of the model progress (it may take a minute or two depending on your machine).
+
+```{r, question-10}
+model <- cv.glmnet(X_train, y_train,
+                   alpha = 0.9,
+                   family = "multinomial",
+                   nfolds = 3,
+                   trace.it = FALSE)  # you should set to true; but it does
+                                      # not show up correctly in the solutions
+```
+
+Plot the model CV curve. Verify that the curve has a steeper bend for small
+values of lambda compared to the previous model.
+
+```{r, question-11}
+plot(model)
+```
+
+Now, determine the classification rate.
+
+```{r, question-12}
+chicago12 %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(pred == crime_type))
+```
+
+How does this compare to random guessing (the data are balanced, with an equal
+number of crimes of each type)? **Answer**: Random guesing would give an error
+rate of 1/12 = 8.3%. Here, we have a rate of 28%. So, while it misses more often
+that it is correct, it is more than three times better than random guessing.
+
+As before, produce a confusion matrix of the model:
+
+```{r, question-13}
+chicago12 %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  select(pred, crime_type, train_id) %>%
+  table()
+```
+
+What are some crimes that seem difficult to tell apart on the validation set?
+**Answer**: There are many answers here. Battery is usually mis-classified as
+robbery or burglary. Criminal damage is often classified as robbery. Deceptive
+practice is often classified as burglary; the same can be said for prostitution.
+
+For each (actual) crime type, compute the error rate for this category on the
+validation set and arrange the data from the highest classification rate to
+the lowest.
+
+```{r, question-14}
+chicago12 %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  filter(train_id == "valid") %>%
+  group_by(crime_type) %>%
+  summarize(class_rate = mean(pred == crime_type), sm_count()) %>%
+  arrange(desc(class_rate))
+```
+
+What types are the hardest to get correct? **Answer** I found battery,
+narcotics, and theft to be the hardest to get correct in my model.
+
+Finally, print out the coefficients for the model by picking a lambda that
+gives about 20 non-zero terms. Take note of any patterns you see in the detected
+locations.
+
+```{r, question-15}
 temp <- coef(model, s = model$lambda[18])
 beta <- Reduce(cbind, temp)
 beta <- beta[apply(beta != 0, 1, any),]
@@ -155,90 +233,56 @@ colnames(beta) <- names(temp)
 beta
 ```
 
-Do these features and signs make sense / seem reasonable to you? Are any
-surprising? **Answer**: Answers vary.
+## Space and Time
 
-## Key Words in Context (KWiC)
+Using the smaller Chicago data set with just three crimes, create a model matrix
+with the following formula:
 
-In the four code blocks below, use the `sm_kwic` function to look at 20
-occurrences of the more surprising/interesting terms you found above.
+`crime_type ~ cut(longitude, breaks = 10) * cut(latitude, breaks = 10) * cut(hour, breaks = 3)`
 
-```{r, question-08}
-sm_kwic("mailman", email$text, n = 20)
+This breaks space and time into individual buckets.
+
+```{r, question-16}
+mf <- model.frame(crime_type ~ cut(longitude, breaks = 10) *
+                               cut(latitude, breaks = 10) *
+                               cut(hour, breaks = 3),
+                  data = chicago)
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
+
+X_train <- X[chicago$train_id == "train",]
+y_train <- y[chicago$train_id == "train"]
 ```
 
-```{r, question-09}
-sm_kwic("wrote", email$text, n = 20)
+Now, fit a cross-validate elastic net on the data using alpha = 0.9 and three
+folds. This may take a minute or two to run, so consider turning on the
+`traceit` flag.
+
+```{r, question-17}
+model <- cv.glmnet(X_train, y_train,
+                   alpha = 0.9,
+                   family = "multinomial",
+                   nfolds = 3,
+                   trace.it = FALSE)   # you should set to true; but it does
+                                       # not show up correctly in the solutions
 ```
 
-```{r, question-10}
-sm_kwic("removed", email$text, n = 20)
-```
+Finally, predict the class impied by the model for the data set and produce a
+scatter plot with longitude on the x-axis, latitude on the y-axis, and the
+points colored by the prediction. Also, add this facet wrap layer to produce
+a different plot for each third of the day:
+`facet_wrap(~cut(hour, breaks = 3), ncol = 4)`
 
-```{r, question-11}
-sm_kwic("date", email$text, n = 20)
-```
-
-Does the KWiC method help explain why some of these are so predictive and/or
-why they are associated with a particular category? **Answer**: Answers vary.
-
-## Negative Examples
-
-In the code block below, print out the negative examples that are classified
-as spam but are actually ham. You might find it useful to add this line into
-the pipe to avoid printing very long messages:
-
-  `mutate(text = stri_sub(text, 1, 250)) %>%`
-
-
-```{r, question-12}
-email %>%
+```{r, question-18}
+chicago %>%
   mutate(pred = predict(model, newx = X, type = "class")) %>%
-  filter(pred != class) %>%
-  filter(class == 0) %>%
-  mutate(text = stri_sub(text, 1, 250)) %>%
-  use_series(text)
+  ggplot(aes(longitude, latitude)) +
+    geom_point(aes(color = pred)) +
+    scale_color_viridis_d() +
+    facet_wrap(~cut(hour, breaks = 3))
 ```
 
-Can you identify why these were incorrectly classified? **Answer**: Answers vary.
-
-And now print out the negative examples that are classified as ham but are
-actually spam.
-
-```{r, question-13}
-email %>%
-  mutate(pred = predict(model, newx = X, type = "class")) %>%
-  filter(pred != class) %>%
-  filter(class == 1) %>%
-  mutate(text = stri_sub(text, 1, 250)) %>%
-  use_series(text)
-```
-
-Can you identify why these were incorrectly classified? **Answer**: Answers vary.
-
-## Extreme Probabilities
-
-In the two blocks below, print out the emails that have the highest and lowest
-predicted probabilities. As in the previous code blocks, consider taking just
-the first 250 characters of the message.
-
-```{r, question-14}
-email %>%
-  mutate(pred = predict(model, newx = X, type = "response")) %>%
-  arrange(desc(pred)) %>%
-  slice_head(n = 10) %>%
-  mutate(text = stri_sub(text, 1, 250)) %>%
-  use_series(text)
-```
-
-```{r, question-15}
-email %>%
-  mutate(pred = predict(model, newx = X, type = "response")) %>%
-  arrange(pred) %>%
-  slice_head(n = 10) %>%
-  mutate(text = stri_sub(text, 1, 250)) %>%
-  use_series(text)
-```
-
-Do these help further explain how the classification algorithm is working? In
-what ways? **Answer**: Answers vary.
+Take note of the patterns of Crime in different parts of the city for different
+times of day. Notice how well our predictive model is able to describe patterns
+that would be hard to find just exploring the source data itself.

@@ -18,194 +18,206 @@ options(sparse.colnames = TRUE)
 options(dplyr.summarise.inform = FALSE)
 ```
 
-# Chicago Crimes
+## Median Tract Income
 
-## Three Types
-
-Today's lab looks at a data set of reported crimes from the city of Chicago
-(if you were in my 289 class last semester, this should look familiar). Our
-prediction task is to predict the type of crime based on the features of the
-reported incident. To start, we'll look at a data set that has three crime
-types: "battery", "criminal damage", and "theft".
+The dataset for today's lab uses U.S. Census data. Our prediction task is to
+predict the median income of a census tract (a small area approximately equal
+to a neighborhood in a city). There are a lot of variables in this data set,
+so it will be good to practice penalized regression with. The code below does
+a bit of data cleaning. I did not do this ahead of time because we will need
+the full dataset later in the semester. It removes a few variables that I do
+not want to use and restricts the data to only the lower-48 states.
 
 ```{r, message=FALSE}
 set.seed(1)
 
-chicago <- read_csv(file.path("data", "chi_crimes_3.csv")) %>%
-  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
-chicago
+tract <- read_csv(file.path("data", "tract_median_income.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.1, "train", "valid")) %>%
+  select(-income_q1, -income_q2, -income_q3, -income_q4, -income_p95) %>%
+  filter(!(state %in% c("HI", "AK")))
+
+tract
 ```
 
-Start by creating a model matrix, response vector, and training model matrix
-and response vector using all of the variables in the data set other than the
-`train_id`. This will be fairly large due to the large number of options for
-the variable `location`.
+To speed up the model creation time, I have only put 10% of the data in the
+training set.
+
+### Example Analysis: CBSA
+
+In each section of this lab, you will create one or more penalized regression
+models. In this first section I have written most of the code for you to make
+it easier to copy this in the following section (these will be good templates
+going forward anyway). To start, let's build a model that only uses the variable
+"cbsa_name". This variable provides a name to metropolitan areas in the country.
+The `cv.glmnet` function has a few extra parameters that let us see how the
+model is running and speeds up the process. We will take about these more next
+time.
+
+```{r}
+mf <- model.frame(median_income ~ cbsa_name,
+                  data = select(tract, -train_id))
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
+
+X_train <- X[tract$train_id == "train",]
+y_train <- y[tract$train_id == "train"]
+
+model <- cv.glmnet(X_train, y_train, alpha = 1, nfolds = 3, trace.it = TRUE)
+```
+
+The following code shows all of the non-zero coefficients for the 22nd lambda
+value. It will be better to only look at the non-zero terms as our datasets
+grow in size.
+
+```{r}
+beta <- coef(model, s = model$lambda[22])
+beta <- beta[apply(beta != 0, 1, any),,drop=FALSE]
+beta
+```
+
+Take not of areas seem to have particularly large or small incomes. Does this
+generally fit your perception of U.S. cities? **Answer**
+
+In the code below, select only those coefficients for the 10th lambda. Notice
+that only a very variables are selected.
 
 ```{r, question-01}
 
 ```
 
-Now, fit a cross-validated elastic net model using 3 folds and alpha equal to
-0.9.
+In the next block, we can see how well this model performs in predicting the
+output variable:
+
+```{r}
+
+```
+
+We will have more to compare it to in the following sections.
+
+### Model 2: Numeric Variables
+
+For the next model, we we are going to fit a lasso regression using all of the
+numeric variables in the dataset as predictors. You can do this by removing the
+variables "train_id", "state", "cbsa_name", and "county" and then setting the
+formula to be "median_income ~ .".
 
 ```{r, question-02}
 
 ```
 
-Next, plot the model using the `plot` function. Take note of the shape of the
-curve and the number of included variables (the numbers of the top of the plot)
-for each value of lambda.
+Show all of the coefficients for the 15th value of lambda:
 
 ```{r, question-03}
 
 ```
 
-And compute the classification rate for the data set.
+Next, look at the 27th lambda:
 
 ```{r, question-04}
 
 ```
 
-How does this compare to random guessing (the data are balanced, with an equal
-number of crimes of each type)? **Answer**: 
-
-Now, build a confusion matrix of the data.
+And now show those for the optimal lambda (you can leave off the parameter
+`s` to get this).
 
 ```{r, question-05}
 
 ```
 
-Focusing on the validation set, are some crimes harder to distinguish than
-others? **Answer**:
+Take a moment to look at the results in the last three questions and understand
+what they tell us about the data.
 
-Now, print out the coefficients for a value of lambda that selects about a
-dozen variables (perhaps try the 21st value of lambda).
+Finally, compute the RMSE of the dataset and compare to the previous model:
 
 ```{r, question-06}
 
 ```
 
-Looking at the selected variables, what locations seem to be most associated
-with each type of crime? **Answer**:
+### Model 3: Numeric Variables with Elastic Net
 
-Now, refit the model using alpha equal to 0.1.
+Now, we will fit the same model as in the previous part, but will add back in
+the cbsa_area variable.
 
 ```{r, question-07}
 
 ```
 
-Now, plot the model.
+Look at the coefficients for the 25th value of lambda. Are any of these CBSA
+areas? **Answer** No.
 
 ```{r, question-08}
 
 ```
 
-Verify that more non-zero components are present at the minimul value of the
-CV-curve.
-
-## Twelve Types
-
-Let's now load another version of the crimes data, this time with 12 different
-categories. The data set is large, so in the interest of time we will only use
-5% of it for the training set to speed things along.
-
-```{r, message=FALSE}
-set.seed(1)
-
-chicago12 <- read_csv(file.path("data", "chi_crimes_12.csv")) %>%
-  mutate(train_id = if_else(runif(n()) < 0.05, "train", "valid"))
-chicago12
-```
-
-Again, build a model matrix and response vector with all of the variables other
-than `train_id`.
+Moving down, try now to see the 35th value of lambda. You should now see a
+few cities come into the model. Are these the same that intially popped up
+before?
 
 ```{r, question-09}
 
 ```
 
-We are going to again fit a cross-validated elastic net model with alpha 0.9,
-and three folds. Add the option `trace.it = TRUE` to have a verbose print out
-of the model progress (it may take a minute or two depending on your machine).
+And now compute the RMSE for the model. How does it compare to the previous
+two models? **Answer**: It is noticably better than both of the last two.
 
 ```{r, question-10}
 
 ```
 
-Plot the model CV curve. Verify that the curve has a steeper bend for small
-values of lambda compared to the previous model.
+### Model 4: Latitude and Longitude
+
+For our last section, start by creating a regression model that uses just the
+lon and lat variables within a lasso regression:
 
 ```{r, question-11}
 
 ```
 
-Now, determine the classification rate.
+Find the RMSE; you will see that it is not as good as the previous models.
 
 ```{r, question-12}
 
 ```
 
-How does this compare to random guessing (the data are balanced, with an equal
-number of crimes of each type)? **Answer**:
+In the code below, I have created a model that fits a 50x50 grid over the U.S.
+and allows for a different coefficent to be applied to each grid point (we
+will visualize this in just a moment).
 
-As before, produce a confusion matrix of the model:
+```{r}
+mf <- model.frame(median_income ~ cut(lon, breaks = 50) * cut(lat, breaks = 50),
+                  data = tract)
+mt <- attr(mf, "terms")
+y <- model.response(mf)
+X <- model.matrix(mt, mf)
+
+X_train <- X[tract$train_id == "train",]
+y_train <- y[tract$train_id == "train"]
+
+model <- cv.glmnet(X_train, y_train, alpha = 1, nfolds = 3, trace.it = TRUE)
+```
+
+Compute the RMSE of this model. You should see that it does slightly better
+than the CBSA model.
 
 ```{r, question-13}
 
 ```
 
-What are some crimes that seem difficult to tell apart on the validation set?
-**Answer**:
+### Plots!
 
-For each (actual) crime type, compute the error rate for this category on the
-validation set and arrange the data from the highest classification rate to
-the lowest.
+Using the last model we created (the 50x50 grid of lat and lon), predict the
+values of the model and draw a scatter plot with longitude on the x-axis,
+latitude on the y-axis, and the points colored by the predictions. I suggest
+using a size of 0.2 and the color scale `scale_color_distiller(palette = "Spectral")`.
 
 ```{r, question-14}
 
 ```
 
-What types are the hardest to get correct? **Answer**:
-
-Finally, print out the coefficients for the model by picking a lambda that
-gives about 20 non-zero terms. Take note of any patterns you see in the detected
-locations.
+To finish, create the same plot but use the smallest value of lambda to fit
+the data to. Notice how the plot looks compared to the previous one.
 
 ```{r, question-15}
 
 ```
-
-## Space and Time
-
-Using the smaller Chicago data set with just three crimes, create a model matrix
-with the following formula:
-
-`crime_type ~ cut(longitude, breaks = 10) * cut(latitude, breaks = 10) * cut(hour, breaks = 3)`
-
-This breaks space and time into individual buckets.
-
-```{r, question-16}
-
-```
-
-Now, fit a cross-validate elastic net on the data using alpha = 0.9 and three
-folds. This may take a minute or two to run, so consider turning on the
-`traceit` flag.
-
-```{r, question-17}
-
-```
-
-Finally, predict the class impied by the model for the data set and produce a
-scatter plot with longitude on the x-axis, latitude on the y-axis, and the
-points colored by the prediction. Also, add this facet wrap layer to produce
-a different plot for each third of the day:
-`facet_wrap(~cut(hour, breaks = 3), ncol = 4)`
-
-```{r, question-18}
-
-```
-
-Take note of the patterns of Crime in different parts of the city for different
-times of day. Notice how well our predictive model is able to describe patterns
-that would be hard to find just exploring the source data itself.
