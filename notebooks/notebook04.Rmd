@@ -19,49 +19,6 @@ options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
 
-## Thought Experiment
-
-In the article "The relationship between jaw, arm and leg size in
-three ethnic groups" (DOI: 10.1002/aja.1001360211), it was determined
-that the length of the average human leg is roughly 20% larger than
-the length of their arms. We know that the length between someone's
-left arm and their right arm are very highly correlated (virtually
-the same, depending on your precision). If we collected data and
-tried to predict the length of left legs as a function of right arms
-and left arms we would have several different choices that seem
-to given essentially the same fit.
-
-We could put all of the model weight on the left arm:
-
-$$ \text{left_leg} = \text{left_arm} \cdot 1.2 + \text{right_arm} \cdot 0.0 $$
-
-All on the right arm:
-
-$$ \text{left_leg} = \text{left_arm} \cdot 0.0 + \text{right_arm} \cdot 1.2 $$
-
-Split it between both arms:
-
-$$ \text{left_leg} = \text{left_arm} \cdot 0.6 + \text{right_arm} \cdot 0.6 $$
-
-Or, do something quite a bit more complex:
-
-$$ \text{left_leg} = \text{left_arm} \cdot 101.2 - \text{right_arm} \cdot 100 $$
-
-If our measurements for left arms and right arms were *exactly* the same,
-there would be no way of distinguishing this infinite set of choices. This
-would then be a *rank deficient* model. If just one person has a different
-left and right arm measurement (perhaps an old injury or we are using very
-precise measuring tool), there will be a best model in the ordinary least
-squares sense. However, this may not match what the best model should be
-for future predictions.
-
-What might be the best choice? Either of the models that put all of the weight
-on one arm is easier to apply because we need only one variable (not two). At
-the same time, the model with an even split will even out any measurement or
-data error made in measuring one of the two arms. At least, in general, it does
-not seem to be a good idea to use the last model with a negative coefficient.
-Before going forward with this idea, let's look at an actual data set.
-
 ## City Tempurature Data
 
 Today we will start by looking at a small data set of temperatures
@@ -296,9 +253,9 @@ Next will run an elastic net regression on the data with alpha equal to 0.9:
 model <- cv.glmnet(X_train, y_train, alpha = 0.9)
 ```
 
-The function intelligently picks a set of 100 values of lambda
-to fit the elastic net to. We can see all of these by looking
-at the lambda parameter of the model
+The function intelligently picks a set of (at most) 100 values of lambda to fit
+the elastic net to. We can see all of these by looking at the lambda parameters
+of the model.
 
 ```{r}
 model$lambda
