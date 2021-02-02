@@ -36,8 +36,8 @@ chicago <- read_csv(file.path("data", "chi_crimes_3.csv")) %>%
 chicago
 ```
 
-Start by creating a model matrix, response vector, and training model matrix
-and response vector using all of the variables in the data set other than the
+Start by creating a model matrix, response vector, training model matrix
+and response vector using all of the variables in the data set other than
 `train_id`. This will be fairly large due to the large number of options for
 the variable `location`.
 
@@ -60,7 +60,8 @@ for each value of lambda.
 
 ```
 
-And compute the classification rate for the data set.
+Now compute the classification rate for the data set (using the default, cross
+validated value of lambda).
 
 ```{r, question-04}
 
@@ -99,9 +100,6 @@ Now, plot the model.
 ```{r, question-08}
 
 ```
-
-Verify that more non-zero components are present at the minimul value of the
-CV-curve.
 
 ## Twelve Types
 
@@ -159,7 +157,8 @@ What are some crimes that seem difficult to tell apart on the validation set?
 
 For each (actual) crime type, compute the error rate for this category on the
 validation set and arrange the data from the highest classification rate to
-the lowest.
+the lowest. Note that this involves using a filter (to take only the validation
+data) followed by the `group_by` function.
 
 ```{r, question-14}
 
