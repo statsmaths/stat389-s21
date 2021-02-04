@@ -74,6 +74,16 @@ this case they are the same magnitude and opposite signs. The different columns
 will include different information in the case of 3 or more categories, as you
 will see in the lab for today.
 
+And then, to get the classification rate, we use the predict function and set
+the type argument equal to "class":
+
+```{r}
+nba %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(pred == fgm))
+```
+
 ### Scaling and intercepts (some technical details)
 
 As we wrote the lasso, ridge regression, and elastic net the
