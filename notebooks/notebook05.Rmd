@@ -40,9 +40,17 @@ X_train <- X[nba$train_id == "train",]
 y_train <- y[nba$train_id == "train"]
 ```
 
-Unlike in `glm` we specify the family name in quotes. We will use a
-"multinomial" model here so that our code can be used verbatim in situations
-with more than two categories (we will see this in the lab today).
+We can fit a binomial model with glmnet, but it will be easier to generalize
+to other data sets to use a multinomial regression model. It will work in the
+case where the variable we are trying to predict can take on more than two
+categories.
+
+Multinomial regression, as implemented by glmnet, works by fitting a separate
+logistic regression model, where we have a set of coefficients for each
+category. Prediction works be applying each of the models and seeing which
+has the greatest probability.
+
+Here is the syntax to run this model using the elastic net:
 
 ```{r}
 model <- cv.glmnet(X_train, y_train, alpha = 0.9, family = "multinomial")
@@ -63,7 +71,8 @@ beta
 The first column indicates those features that classify the 0 category (shot
 missed) and the second features that classify the 1 category (shot made). In
 this case they are the same magnitude and opposite signs. The different columns
-will include different information in the case of 3 or more categories.
+will include different information in the case of 3 or more categories, as you
+will see in the lab for today.
 
 ### Scaling and intercepts (some technical details)
 

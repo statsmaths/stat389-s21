@@ -517,7 +517,9 @@ summary {
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>X_train <span class="ot">&lt;-</span> X[nba<span class="sc">$</span>train_id <span class="sc">==</span> <span class="st">&quot;train&quot;</span>,]</span>
 <span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>y_train <span class="ot">&lt;-</span> y[nba<span class="sc">$</span>train_id <span class="sc">==</span> <span class="st">&quot;train&quot;</span>]</span></code></pre></div>
-<p>Unlike in <code>glm</code> we specify the family name in quotes. We will use a “multinomial” model here so that our code can be used verbatim in situations with more than two categories (we will see this in the lab today).</p>
+<p>We can fit a binomial model with glmnet, but it will be easier to generalize to other data sets to use a multinomial regression model. It will work in the case where the variable we are trying to predict can take on more than two categories.</p>
+<p>Multinomial regression, as implemented by glmnet, works by fitting a separate logistic regression model, where we have a set of coefficients for each category. Prediction works be applying each of the models and seeing which has the greatest probability.</p>
+<p>Here is the syntax to run this model using the elastic net:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>model <span class="ot">&lt;-</span> <span class="fu">cv.glmnet</span>(X_train, y_train, <span class="at">alpha =</span> <span class="fl">0.9</span>, <span class="at">family =</span> <span class="st">&quot;multinomial&quot;</span>)</span></code></pre></div>
 <p>Now, let’s take a look at the non-zero coefficients in the model for a specific value of lambda. The code here is something that we will use many times, changing only the parameter <code>s</code> in the first line.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>temp <span class="ot">&lt;-</span> <span class="fu">coef</span>(model, <span class="at">s =</span> model<span class="sc">$</span>lambda[<span class="dv">22</span>])</span>
@@ -533,7 +535,7 @@ summary {
 ## shot_dist        0.021474776 -0.021474776
 ## close_def_dist  -0.021229592  0.021229592
 ## defender_height  0.001642631 -0.001642631</code></pre>
-<p>The first column indicates those features that classify the 0 category (shot missed) and the second features that classify the 1 category (shot made). In this case they are the same magnitude and opposite signs. The different columns will include different information in the case of 3 or more categories.</p>
+<p>The first column indicates those features that classify the 0 category (shot missed) and the second features that classify the 1 category (shot made). In this case they are the same magnitude and opposite signs. The different columns will include different information in the case of 3 or more categories, as you will see in the lab for today.</p>
 <div id="scaling-and-intercepts-some-technical-details" class="section level3">
 <h3>Scaling and intercepts (some technical details)</h3>
 <p>As we wrote the lasso, ridge regression, and elastic net the scale of the predictor variables would have a large impact on the model. We did not focus on this because <strong>glmnet</strong> always scales the columns to have unit variance and zero mean. Generally, we do not have to worry about this and I have rarely found a reason to modify this default behavior.</p>

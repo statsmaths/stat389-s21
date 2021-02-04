@@ -74,7 +74,7 @@ the specifics, how would you do that?
 In order to use any of the linear models that we have seen so far, we need to
 create numeric predictor variables ("features") from the data set. Often this
 has been only an issue of choosing which existing numeric variables to include
-in our model. Sometimes we needed to do a bit more works, such as using a
+in our model. Sometimes we needed to do a bit more work, such as using a
 polynomial expansion or indicator variables. When working with text, creating
 the feature variables is much more of an art-form. In fact, it is what we will
 spend much of the rest of the semester focused on.
@@ -181,8 +181,8 @@ token %>%
   arrange(desc(count))
 ```
 
-These are all fairly common words or symbols that we would expect to be common
-in text messages.
+These are all fairly common words or symbols that we would expect to occur
+frequently in text messages.
 
 ### Term frequency (TF) matrix
 
@@ -218,7 +218,7 @@ second uses none, and the third uses four.
 
 We can create a training data from the term frequency matrix using the same
 syntax as with a dense matrix. We will create the training response by
-directly grabbing the variable rom the `spam` data.
+directly grabbing the variable `class` from the `spam` data.
 
 ```{r}
 X_train <- X[spam$train_id == "train", ]
@@ -232,7 +232,7 @@ And now we can use this data to build a model.
 Our model matrix has a very large number of columns. It has, in fact, more
 columns that rows! It is not possible to use a standard linear or logistic
 regression model. However, penalized regression is perfect: it will
-automatically the best variables to use in the model.
+automatically select the best variables to use in the model.
 
 The **glmnet** package is able to work directly to sparse matrices, so we can
 run the model just as we did in the previous notebook.
