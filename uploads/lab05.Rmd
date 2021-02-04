@@ -60,11 +60,16 @@ for each value of lambda.
 
 ```
 
-Now compute the classification rate for the data set (using the default, cross
-validated value of lambda).
+Now we will compute the classification rate for the data set (using the default,
+cross validated value of lambda). I will show you the answer because it differs
+slightly from the last lab; mainly, we need to set `type = "class"` in the
+predict function.
 
 ```{r, question-04}
-
+chicago %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(pred == crime_type))
 ```
 
 How does this compare to random guessing (the data are balanced, with an equal
