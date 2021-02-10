@@ -37,7 +37,7 @@ We can look at a few examples of spam:
 
 ```{r, message=FALSE}
 email %>%
-  filter(class == 0) %>%
+  filter(class == 1) %>%
   sample_n(3) %>%
   use_series(text)
 ```
@@ -46,7 +46,7 @@ And not spam:
 
 ```{r, message=FALSE}
 email %>%
-  filter(class == 1) %>%
+  filter(class == 0) %>%
   sample_n(3) %>%
   use_series(text)
 ```
