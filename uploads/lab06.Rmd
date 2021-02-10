@@ -33,6 +33,26 @@ email <- read_csv(file.path("data", "spam_email.csv")) %>%
 head(email)
 ```
 
+We can look at a few examples of spam:
+
+```{r, message=FALSE}
+email %>%
+  filter(class == 0) %>%
+  sample_n(3) %>%
+  use_series(text)
+```
+
+And not spam:
+
+```{r, message=FALSE}
+email %>%
+  filter(class == 1) %>%
+  sample_n(3) %>%
+  use_series(text)
+```
+
+These should help as you choose a few manual features in the next section.
+
 ## Building Manual Features
 
 To start, let's try to build manual features to predict whether a message is
@@ -45,8 +65,7 @@ out a summary of the model.
 ```
 
 According to the model, all other things being equal, are longer messages more
-or less likely to be spam? **Answer**: In my model, longer messages are more
-likely to not be spam.
+or less likely to be spam? **Answer**:
 
 Now, compute the classification rate on the training and validation sets:
 
@@ -114,7 +133,7 @@ about twelve selected variables.
 ```
 
 Do these features and signs make sense / seem reasonable to you? Are any
-surprising? **Answer**:
+surprising? **Answer**: Answers vary.
 
 ## Key Words in Context (KWiC)
 
@@ -139,44 +158,3 @@ occurrences of the more surprising/interesting terms you found above.
 
 Does the KWiC method help explain why some of these are so predictive and/or
 why they are associated with a particular category? **Answer**:
-
-## Negative Examples
-
-In the code block below, print out the negative examples that are classified
-as spam but are actually ham. You might find it useful to add this line into
-the pipe to avoid printing very long messages:
-
-  `mutate(text = stri_sub(text, 1, 250)) %>%`
-
-
-```{r, question-12}
-
-```
-
-Can you identify why these were incorrectly classified? **Answer**:
-
-And now print out the negative examples that are classified as ham but are
-actually spam.
-
-```{r, question-13}
-
-```
-
-Can you identify why these were incorrectly classified? **Answer**:
-
-## Extreme Probabilities
-
-In the two blocks below, print out the emails that have the highest and lowest
-predicted probabilities. As in the previous code blocks, consider taking just
-the first 250 characters of the message.
-
-```{r, question-14}
-
-```
-
-```{r, question-15}
-
-```
-
-Do these help further explain how the classification algorithm is working? In
-what ways? **Answer**:

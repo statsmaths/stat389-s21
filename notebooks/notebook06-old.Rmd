@@ -291,3 +291,59 @@ sm_kwic("or", spam$text, n = 20)
 
 And we see that it is used in a few different common constructions such as
 "or stop" or to describe different types of prizes available in a contest.
+
+### Max probability
+
+Another way of investigating a model is to see the documents that have the
+strongest prediction values. That is, those messages that the model thinks
+are most and least likely to be spam. Here are the messages most likely to
+be spam:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "response")) %>%
+  arrange(desc(pred)) %>%
+  slice_head(n = 10) %>%
+  use_series(text)
+```
+
+And these are the messages most likely to be ham:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "response")) %>%
+  arrange(pred) %>%
+  slice_head(n = 10) %>%
+  use_series(text)
+```
+
+Can you identify any interesting patterns here?
+
+### Negative Examples
+
+Similarly, we can try to look at "negative examples", those messages that are
+incorrectly predicted by the model. Here are the negative examples that are
+ham but classified as spam:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  filter(pred != class) %>%
+  filter(class == 0) %>%
+  use_series(text)
+```
+
+Do you notice anything interesting here? How about with the spam messages
+incorrectly classified as ham:
+
+```{r}
+spam %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  filter(pred != class) %>%
+  filter(class == 1) %>%
+  use_series(text)
+```
+
+In this case there were few enough negative examples to look at them all. In the
+case of more difficult prediction tasks, you may want to look at only those
+negative examples that have a relatively extreme predicted probability.
