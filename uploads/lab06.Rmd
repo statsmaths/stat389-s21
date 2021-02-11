@@ -133,7 +133,7 @@ about twelve selected variables.
 ```
 
 Do these features and signs make sense / seem reasonable to you? Are any
-surprising? **Answer**: Answers vary.
+surprising? **Answer**: 
 
 ## Key Words in Context (KWiC)
 
