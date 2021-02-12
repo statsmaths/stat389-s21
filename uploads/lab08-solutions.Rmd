@@ -144,7 +144,8 @@ validation data.
 In the code block below, create a TF matrix of just lemmas that are adjectives
 ("ADJ"). This time do not cap the maximum proportion of documents that can
 contain a token. Fit an elastic net as above and print out the classification
-rate on the training and validation data.
+rate on the training and validation data. For this model (and the following
+ones), use `max_df = 1`.
 
 ```{r, warning=FALSE, question-09}
 X <- token %>%
@@ -190,7 +191,7 @@ us %>%
   summarize(class_rate = mean(author == pred))
 ```
 
-And once again with "PUNCT" marks:
+And again, using the "PUNCT" marks:
 
 ```{r, question-11}
 X <- token %>%
@@ -220,8 +221,7 @@ vary.
 
 For the remainder of the lab, we are going to use the data set to get familiar
 with the features that are available for building machine learning models. You
-may be inclined to rush, but try to take your own time here. It will pay off
-very soon.
+may be inclined to rush, but try to take your time here.
 
 ### Lemmas
 
@@ -233,7 +233,7 @@ get turned into the lemma "sit".
 
 ```{r, question-12}
 token %>%
-  filter(lemma == "have") %>%
+  filter(lemma == "sit") %>%
   group_by(upos, token) %>%
   summarize(sm_count()) %>%
   arrange(desc(count))
@@ -244,7 +244,7 @@ the contraction "you've" and "'d" from "you'd", "he'd", or "she'd".
 
 ```{r, question-13}
 token %>%
-  filter(lemma == "sit") %>%
+  filter(lemma == "have") %>%
   group_by(upos, token) %>%
   summarize(sm_count()) %>%
   arrange(desc(count))
@@ -273,8 +273,8 @@ token %>%
 ```
 
 You should notice that spaCy has turned all pronouns into a generic lemma
-"-PRON-". This is often not idea and something that we will sometimes want
-to adjust before creating a model.
+"-PRON-". This is often not a good idea for predictive models and is something
+that we will sometimes want to adjust before creating a model.
 
 ### XPOS Tags
 
@@ -290,7 +290,7 @@ token %>%
   arrange(desc(count)) %>%
   slice_head(n = 8) %>%
   summarize(sm_paste(token)) %>%
-  rmarkdown::paged_table()       # just for the notes to make the data viewable
+  rmarkdown::paged_table()        # just for the notes to make the data viewable
 ```
 
 Go through the list and try to understand what each of the tags captures. Use

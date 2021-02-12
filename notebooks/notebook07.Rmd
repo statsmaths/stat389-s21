@@ -44,7 +44,7 @@ As we did in the previous notes, we will use the **cleanNLP** package to split
 the textual data into a format with one row for each token (word or punctuation
 mark). Last time we used the **stringi** backend, which is fast but error-prone.
 This time we will use a library called **spacy** for extracting linguistic
-features from the text. Running this back end can be done with the following
+features from the text. Running this backend can be done with the following
 code:
 
 ```{r, eval=FALSE}
@@ -66,8 +66,7 @@ There is a lot of information that has been automatically added to this table,
 the collective results of decades of research in computational linguistics and
 natural language processing. Each row corresponds to a word or a punctuation
 mark, along with metadata describing the token. Notice that reading down the
-column `token` reproduces the original text. The columns available
-are:
+column `token` reproduces the original text. The columns available are:
 
 - **doc_id**: A key that allows us to group tokens into documents and to link
 back into the original input table.
@@ -81,8 +80,7 @@ characters) added. This is useful if we wanted to re-create the original text
 from the token table.
 - **lemma**: A normalized version of the token. For example, it removes
 start-of-sentence capitalization, turns all nouns into their singular form,
-and converts verbs into their
-infinitive form.
+and converts verbs into their infinitive form.
 - **upos**: The universal part of speech code, which are parts of speech that
 can be defined in (most) spoken languages. These tend to correspond to the
 parts of speech taught in primary schools, such as "NOUN", "ADJ" (Adjective),
@@ -153,9 +151,7 @@ amazon %>%
   table()
 ```
 
-The code to look at the coefficients is slightly different here because this is
-a multinomial model rather than a binomial one. Each category has its own
-coefficients.
+Notice that each category has its own coefficients.
 
 ```{r}
 temp <- coef(model, s = model$lambda[22])
