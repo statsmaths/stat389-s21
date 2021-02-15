@@ -235,3 +235,75 @@ beta
 
 As with the first model matrix, most of these should seem reasonable to you
 based on the categories.
+
+### Dependencies
+
+Dependencies give relationships between words in a sentence. For example,
+they relate the subject and object of a sentence to a verb. Or, relate an
+adjective to the noun that it modifies. We will use these extensively when
+we get to stylometric analysis, but it is a good idea to start seeing how
+they can be used even in a simple classification analysis. For example,
+we can find which verbs are associated with sentences where the subject is
+"I":
+
+```{r}
+token %>%
+  left_join(
+    select(token, doc_id, sid, tid_source = tid, lemma_source = lemma),
+    by = c("doc_id", "sid", "tid_source")
+  ) %>%
+  filter(token == "I", relation == "nsubj") %>%
+  group_by(lemma_source) %>%
+  summarize(sm_count()) %>%
+  arrange(desc(count))
+```
+
+Likewise, we can use these verbs to build a model:
+
+```{r}
+X <- token %>%
+  left_join(select(token, doc_id, sid, tid_source = tid, lemma_source = lemma),
+            by = c("doc_id", "sid", "tid_source")) %>%
+  filter(token == "I", relation == "nsubj") %>%
+  cnlp_utils_tf(doc_set = amazon$doc_id,
+                min_df = 0.001,
+                max_df = 1,
+                max_features = 10000,
+                token_var = "lemma_source")
+
+dim(X)
+```
+
+Fitting it as before:
+
+```{r}
+X_train <- X[amazon$train_id == "train", ]
+y_train <- amazon$category[amazon$train_id == "train"]
+
+model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
+```
+
+As you might expect, this model is not nearly as predictive as it ignores
+many of the useful features in the review. However, given it's limited
+information, it does almost twice as well as random guessing would:
+
+```{r}
+amazon %>%
+  mutate(pred = predict(model, newx = X, type = "class")) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(category == pred))
+```
+
+And as with the verb-based model, it is really the coefficents that are the
+most interesting for us to work with:
+
+```{r}
+temp <- coef(model, s = model$lambda[14])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
+
+Do these also match your intuition for what verbs would be associated with
+each product?
