@@ -1,5 +1,5 @@
 ---
-title: "Notebook 08: Review"
+title: "Notebook 08: Text Analysis Pipeline"
 output:
   html_document:
     theme: cosmo
@@ -14,8 +14,338 @@ library(ggrepel)
 library(smodels)
 library(cleanNLP)
 library(glmnet)
+library(magrittr)
+library(stringi)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
+
+# A Text Analysis Pipeline
+
+This notebook is written specifically to provide an easy-resource for finding
+code that you will need for the next two projects. My hope is that this will
+help focus your group on the results of the analysis rather than hunting down
+code and also make it easy to see the various ways that you can play with the
+models and the results to explore your data. We will work today with the Amazon
+product review data because it is relatively simple, and the results are easy
+to interpret, but it is complex enough to show many of the most important
+features of a text analysis pipeline using the tools we have developed so far.
+
+Note that the parts here are a process, not a checklist. You will likely need
+to run and investigate several models, tweaking them along the way, as you
+explore a corpus of text. The part names are simply to help you distinguish
+what each bit of code is doing.
+
+## Part 1: Read in the Data
+
+Our first step will be reading in the data and the pre-parsed tokens. If not
+already provided, we will also create training and validation tags. Note that
+usually this block of code will be given to you.
+
+```{r, message = FALSE}
+set.seed(1)
+
+amazon <- read_csv("data/amazon_product_class.csv") %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+token <- read_csv("data/amazon_product_class_token.csv.gz")
+```
+
+Note that in all of the code below you would need to change the name of the
+data, here **amazon**, to the name of your new data, and the name of the
+response variable, here **category**, to the name of the response variable in
+the data you are working with. Other names should be consistent if you use the
+data I have created.
+
+## Part 2: Create a Term Frequency (TF) Matrix
+
+The next step is to create a term frequency matrix, the model matrix we will
+use to find those features that are most strongly associated with each category
+in the data. This uses the function `cnlp_utils_tf`, which has a number of
+options we can change (some are listed below). We can also add different types
+of pre-processing and filtering before passing the tokens data to the
+`cnlp_utils_tf` function. There are several different ways of creating the
+TF matrix, which we will separate into four sub-parts.
+
+### Part 2a: Raw Frequencies
+
+This is the default approach, where we simply count how frequently lemmas
+(word forms) occur in the text.
+
+```{r}
+X <- token %>%
+  filter(upos %in% c("ADJ", "ADV", "NOUN", "VERB")) %>%
+  cnlp_utils_tf(
+    doc_set = amazon$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "lemma"
+  )
+```
+
+You can adjust `min_df`, `max_df`, and `max_features` to change which features
+are included in the model. The `doc_var` and `token_var` arguments indicate the
+variable names used to create the documents and create the features. You
+probably will not need to change these right now, but we will later.
+
+### Part 2b: N-Grams (instead of 2a)
+
+Another option is to count sequences of words using N-grams. A 2-gram considers
+pairs of subsequent words, 3-grams triples, and so forth. To create N-grams we
+use the function `sm_ngram`. We can provide the maximum length of the N-grams,
+as well as the minimum length.
+
+```{r, eval = FALSE}
+X <- token %>%
+  sm_ngram(n = 2, n_min = 1, doc_var = "doc_id", token_var = "lemma") %>%
+  cnlp_utils_tf(
+    doc_set = amazon$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "token"
+  )
+```
+
+Note that setting these values too large will create huge data sets that may
+be difficult for your machine to process the results.
+
+### Part 2c: Skip Grams (instead of 2a)
+
+A skip-gram is similar to an N-gram, however they count combinations of words
+that appear near one another with the possibility of having some terms between
+them. For example, skip-grams with N equal to 2 and a skip of 1 would consist
+of standard 2-grams as well as pairs of words separated by a third. Here, for
+example is the 2-skip-gram with a skip (k) of 1:
+
+```{r, eval = FALSE}
+X <- token %>%
+  sm_skip_ngram(n = 2, n_min = 1, k = 1, doc_var = "doc_id", token_var = "lemma") %>%
+  cnlp_utils_tf(
+    doc_set = amazon$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "token"
+  )
+```
+
+Even more than N-grams, be careful with trying to create models that are too
+large.
+
+### Part 2d: Adding Covariates (optional; use along with 2a, 2b, or 2c)
+
+Another way of modifying the model matrix is to include a small set of
+additional features into the matrix along with the word counts. Typically
+these come from additional metadata from our corpus. However, they can also
+come from hand-constructed features from the texts. For example, let's create
+a model matrix of covariates using the count of capital letters and numbers:
+
+```{r}
+X_cov <- amazon %>%
+  mutate(cnt_caps = stri_count(text, regex = "[A-Z]")) %>%
+  mutate(cnt_nums = stri_count(text, regex = "[0-9]")) %>%
+  model.frame(category ~ cnt_caps + cnt_nums -1, data = .) %>%
+  model.matrix(attr(., "terms"), .)
+```
+
+Then, we combine this matrix together with the TF matrix using the function
+`cbind`:
+
+```{r}
+X <- cbind(X_cov, X)
+```
+
+Once we have this matrix (which should still be sparse), we can fit the model
+as usual. This will be most useful in later projects where we have additional
+covariates that you may want to include.
+
+## Part 3: Build a Penalized Regression Model
+
+Now that we have a term frequency matrix, we can fit a regression model. The
+first two lines create the training data (just modify the data and response
+names; nothing else to change here). Next, the `cv.glmnet` function has a
+number of options. We have talked about most of these. The options
+`lambda.min.ratio` and `nlambda` can be used to run the model faster; I usually
+find the best control is to play with the first, not the second, setting it a
+bit higher (0.02 or 0.05) will run faster.
+
+```{r, eval=FALSE}
+X_train <- X[amazon$train_id == "train", ]
+y_train <- amazon$category[amazon$train_id == "train"]
+
+model <- cv.glmnet(
+  X_train,
+  y_train,
+  alpha = 0.9,
+  family = "multinomial",
+  nfolds = 3,
+  trace.it = TRUE,
+  relax = FALSE,
+  lambda.min.ratio = 0.01,
+  nlambda = 100
+)
+```
+```{r, echo=FALSE}
+X_train <- X[amazon$train_id == "train", ]
+y_train <- amazon$category[amazon$train_id == "train"]
+
+model <- cv.glmnet(
+  X_train,
+  y_train,
+  alpha = 0.9,
+  family = "multinomial",
+  nfolds = 3,
+  trace.it = FALSE,
+  relax = FALSE,
+  lambda.min.ratio = 0.01,
+  nlambda = 100
+)
+```
+
+I will continue to use `trace.it = FALSE` in the notebooks and solutions because
+it does not print out well when creating the HTML documents I post on the
+website. I recommend setting it to be `TRUE` in your interactive work.
+
+## Part 4: Evaluate the Model Fit
+
+Next, we want to look at the model itself. This is the first part where we can
+start understanding the data we are looking at.
+
+### Part 4a: Classification Rate
+
+We can start by seeing how well the model predicts the responses. We can do
+this will the following code:
+
+```{r}
+amazon %>%
+  mutate(pred = as.vector(predict(model, newx = X, type = "class"))) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(category == pred))
+```
+
+It will give the classification rate for the training and validation set, using
+the cross-validated value of lambda
+
+### Part 4b: Segmented Error Rates
+
+Another approach we can use is to look at how well the model predicts each
+class. This will be useful when looking at a large number of categories.
+Remember that you will need to change the variable **category** to the variable
+name in your data containing the response variable.
+
+```{r}
+amazon %>%
+  mutate(pred = as.vector(predict(model, newx = X, type = "class"))) %>%
+  group_by(category, train_id) %>%
+  summarize(class_rate = mean(category == pred)) %>%
+  pivot_wider(names_from = "train_id", values_from = "class_rate") %>%
+  arrange(valid)
+```
+
+The code above sorts by the worst error rate. You can remove the `arrange()`
+function to show the categories in their default order.
+
+### Part 4c: Confusion Matrix
+
+Finally, we can also look at a full confusion matrix. This helps figure out
+which categories are being mistaken for other categories.
+
+```{r}
+amazon %>%
+  mutate(pred = as.vector(predict(model, newx = X, type = "class"))) %>%
+  filter(train_id == "valid") %>%
+  select(category, pred) %>%
+  table()
+```
+
+Note that I have changed this a bit from the earlier notes to only show the
+confusion matrix for the validation set (usually what we want anyway).
+
+## Part 5: Investigate Coefficients
+
+Now, perhaps the most important step: looking at the model coefficients.
+
+```{r}
+temp <- coef(model, s = model$lambda[15])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
+
+You should adjust the lambda number to pick a number of variables that provides
+just enough variables to understand what the most important variables are.
+
+## Part 6: Exploring the Coefficients with Keywords in Context (KWiC)
+
+To understand better how words are being used in the text, we can use the
+the function `sm_kwic`. Here is the function with all of the available options:
+
+```{r}
+sm_kwic("play", amazon$text, n = 15, ignore_case = TRUE, width = 30L)
+```
+
+This selects 15 examples of the word "play" (ignoring case), and prints out
+30 characters to the left and right of the word's context.
+
+## Part 7: Exploring the Model Fit
+
+### Part 7a: Negative Examples
+
+One way to understand how the model is working is to look at negative examples,
+those texts that the model is not making the correct classifications for.
+This code shows 10 random validation examples that are mis-classified.
+
+```{r}
+amazon %>%
+  mutate(pred = as.vector(predict(model, newx = X, type = "class"))) %>%
+  filter(train_id == "valid") %>%
+  filter(pred != category) %>%
+  sample_n(size = 10) %>%
+  mutate(text = stri_sub(text, 1, 500)) %>%
+  mutate(response = sprintf("%s => %s \n %s\n", category, pred, text)) %>%
+  use_series(response) %>%
+  stri_split(fixed = "\n") %>%
+  unlist() %>%
+  stri_wrap(width = 79) %>%
+  cat(sep = "\n")
+```
+
+The output is formatted to show just the first 500 characters of the text, but
+you can increase this as needed. It also shows the correct category, followed
+by the predicted category.
+
+### Part 7b: Max Probability
+
+Another way to explore the model fit is to look at the texts that have the
+most extreme probabilities. The code here takes the top 3 texts from each
+category that is given the highest probability.
+
+```{r}
+pred_mat <- predict(model, newx = X, type = "response")[,,]
+amazon %>%
+  mutate(pred = colnames(pred_mat)[apply(pred_mat, 1, which.max)]) %>%
+  mutate(prob = apply(pred_mat, 1, max)) %>%
+  filter(train_id == "valid") %>%
+  group_by(category) %>%
+  arrange(desc(prob)) %>%
+  slice_head(n = 3) %>%
+  mutate(text = stri_sub(text, 1, 500)) %>%
+  mutate(
+    response = sprintf("%s => %s (%0.5f) \n %s\n", category, pred, prob, text)
+  ) %>%
+  use_series(response) %>%
+  stri_split(fixed = "\n") %>%
+  unlist() %>%
+  stri_wrap(width = 79) %>%
+  cat(sep = "\n")
+```
+
+Usually these will be correctly labeled, but it is possible that there are
+some errors still.
