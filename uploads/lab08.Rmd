@@ -1,0 +1,82 @@
+---
+title: "Lab 08"
+output: html_document
+---
+
+```{r, include=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+library(smodels)
+library(stringi)
+library(Matrix)
+library(glmnet)
+library(cleanNLP)
+library(magrittr)
+
+theme_set(theme_minimal())
+options(sparse.colnames = TRUE)
+options(dplyr.summarise.inform = FALSE)
+```
+
+# U.K. Authors
+
+In this lab we will look at a corpus of short snippets of novels from five
+U.K. authors. The data have already been split into a training and validation
+set. All we need to do is read the data and its tokens into R:
+
+```{r, message=FALSE}
+uk <- read_csv(file.path("data", "stylo_uk.csv"))
+token <- read_csv(file.path("data", "stylo_uk_token.csv.gz"))
+head(uk)
+```
+
+This is an unstructured lab. There are no fixed questions. Rather, I want you
+to use the pipeline in the notes from today to study the textual data using the
+techniques we have covered in a more free-form way. I suggest that you try this:
+
+1. Build a model using the default values, with a TF matrix using lemmas from
+the four upos codes mentioned in today's notes (VERB, NOUN, ADJ, ADV). Look at
+each step listed in the notes and make sure you understand what these are doing.
+Make sure you understand what the models are telling you about the data.
+2. Modify your code to use 2-grams of the lemmas. See how this effects the
+predictive power of the model. Do any 2-grams seem particularly helpful in the
+prediction?
+3. If you have time left, try looking again at a simple TF matrix with just 
+lemma frequencies, but only use a single upos code.
+
+Try to organize the code below in a way that would be easy to come back to next
+time (not too much or too little in each block; about one "part" from the notes 
+is usually about correct).
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+
+```
+
+
+
+

@@ -5,6 +5,7 @@ lab04.Rmd
 lab05.Rmd
 lab06.Rmd
 lab07.Rmd
+lab08.Rmd
 note-style.css
 data/ca_house_price.csv
 data/diamonds.csv
@@ -16,4 +17,6 @@ data/chi_crimes_12.csv
 data/spam_email.csv
 data/stylo_us.csv
 data/stylo_us_token.csv.gz
+data/stylo_uk.csv
+data/stylo_uk_token.csv.gz
 
