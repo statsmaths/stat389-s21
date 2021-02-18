@@ -25,7 +25,11 @@ U.K. authors. The data have already been split into a training and validation
 set. All we need to do is read the data and its tokens into R:
 
 ```{r, message=FALSE}
-uk <- read_csv(file.path("data", "stylo_uk.csv"))
+set.seed(1)
+
+uk <- read_csv(file.path("data", "stylo_uk.csv")) %>%
+  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
+
 token <- read_csv(file.path("data", "stylo_uk_token.csv.gz"))
 head(uk)
 ```
@@ -41,11 +45,11 @@ Make sure you understand what the models are telling you about the data.
 2. Modify your code to use 2-grams of the lemmas. See how this effects the
 predictive power of the model. Do any 2-grams seem particularly helpful in the
 prediction?
-3. If you have time left, try looking again at a simple TF matrix with just 
+3. If you have time left, try looking again at a simple TF matrix with just
 lemma frequencies, but only use a single upos code.
 
 Try to organize the code below in a way that would be easy to come back to next
-time (not too much or too little in each block; about one "part" from the notes 
+time (not too much or too little in each block; about one "part" from the notes
 is usually about correct).
 
 ```{r}
@@ -76,7 +80,3 @@ is usually about correct).
 ```{r}
 
 ```
-
-
-
-
