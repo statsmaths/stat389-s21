@@ -55,7 +55,7 @@ The goal of your project is to apply the methods we have developed so far to
 explore your corpus and understand what features distinguish the two categories
 you have been assigned. Here are some things you should consider addressing:
 
-- How accurately can you classify the two groups based on the text on the
+- How accurately can you classify the groups based on the text on the
 validation data?
 - What terms most distinguish the groups? Are there any bigrams or skip
 grams that are particularly important? If you look at just verbs or adjectives

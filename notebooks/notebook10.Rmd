@@ -79,7 +79,7 @@ safely compared across corpora even when the length of documents or frequency
 of terms is very different between the two. One downside is that it does not
 provide an overall accuracy or confusion matrix that allows us to see how
 useful a feature is in distinguishing two categories. It also does not allow
-us to include additional covariates. But perhaps the biggest downside is that
+us to include additional covariates. Perhaps the biggest downside is that
 the G-squared does not work in the case of more than two categories.
 
 Generally, I recommend using the two in tandem. I typically start with the

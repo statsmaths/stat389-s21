@@ -6,6 +6,7 @@ lab05.Rmd
 lab06.Rmd
 lab07.Rmd
 lab08.Rmd
+project01.Rmd
 note-style.css
 data/ca_house_price.csv
 data/diamonds.csv
