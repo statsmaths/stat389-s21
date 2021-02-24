@@ -1,5 +1,5 @@
 ---
-title: "Notebook 10: Metrics: G-Score"
+title: "Notebook 10: Part of Speech as Feature"
 output:
   html_document:
     theme: cosmo
@@ -12,78 +12,107 @@ library(tidyverse)
 library(forcats)
 library(ggrepel)
 library(smodels)
+library(cleanNLP)
+library(glmnet)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
 
-## Spam, one last time
+## Part of Speech as Feature
 
-For a final time, let's look at the spam text message data.
+For today's notes, let's use the U.S. Authors data set.
 
-```{r, message=FALSE}
-spam <- read_csv("data/spam.csv") %>%
-  mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
-token <- read_csv("data/spam_token.csv.gz")
+```{r, message = FALSE}
+us <- read_csv(file.path("data", "stylo_us.csv"))
+token <- read_csv(file.path("data", "stylo_us_token.csv.gz"))
 ```
 
-We will see today a simple metric that we can use in parallel to the
-coefficients from a penalized linear regression.
 
-### Dunn-Likelihood, G-squared
-
-Given a textual feature (such as a word count) and a variable that groups a
-corpus into two groups, the Dunn-likelihood, or G-squared, metric indicates how
-strongly the feature is associated with one group over the other. To compute
-the measurement, we use the function `sm_dunn_ll`, providing the name of the
-grouping variable and the feature variable. Note that this often requires
-joining together the token data set and the text data set; be careful to drop
-off the text column so as not to create many large copies of the corpus.
 
 ```{r}
-left_join(token, select(spam, doc_id, class), by = "doc_id") %>%
-  sm_dunn_ll(group_name = "class", token_name = "lemma") %>%
-  arrange(dunn)
+X <- token %>%
+  cnlp_utils_tf(
+    doc_set = us$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "upos"
+  )
 ```
-
-The sign of the score indicates which group a feature is most associated with;
-the magnitude gives the size of the effect. The output here shows many of the
-same features we saw before, such as £, "call", "txt" and "!". Looking at the
-most positive features also is similar to the results we had previously from
-the penalized regression model:
 
 ```{r}
-left_join(token, select(spam, doc_id, class), by = "doc_id") %>%
-  sm_dunn_ll(group_name = "class", token_name = "lemma") %>%
-  arrange(desc(dunn))
+X_train <- X[us$train_id == "train", ]
+y_train <- us$author[us$train_id == "train"]
+
+model <- cv.glmnet(
+  X_train,
+  y_train,
+  alpha = 0.9,
+  family = "multinomial",
+  nfolds = 3,
+  trace.it = TRUE,
+  relax = FALSE,
+  lambda.min.ratio = 0.01,
+  nlambda = 100
+)
 ```
 
-The score can be used equally as well with other features, such as the
-universal part of speech codes:
 
 ```{r}
-left_join(token, select(spam, doc_id, class), by = "doc_id") %>%
-  sm_dunn_ll(group_name = "class", token_name = "upos") %>%
-  arrange(dunn)
+us %>%
+  mutate(pred = as.vector(predict(model, newx = X, type = "class"))) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(author == pred))
 ```
 
-And again, this is similar to the patterns we saw looking at the coefficients
-of a penalized regression model.
 
-What are the relative benefits and drawbacks of the G-squared metric relative
-to running a penalized regression model? The G-squared metric is useful because
-it provides an absolute number that does not depend on the other features in the
-model or the tuning parameters (alpha and lambda) used in the model. It can be
-safely compared across corpora even when the length of documents or frequency
-of terms is very different between the two. One downside is that it does not
-provide an overall accuracy or confusion matrix that allows us to see how
-useful a feature is in distinguishing two categories. It also does not allow
-us to include additional covariates. Perhaps the biggest downside is that
-the G-squared does not work in the case of more than two categories.
+```{r}
+temp <- coef(model, s = model$lambda[15])
+beta <- Reduce(cbind, temp)
+beta <- beta[apply(beta != 0, 1, any),]
+colnames(beta) <- names(temp)
+beta
+```
 
-Generally, I recommend using the two in tandem. I typically start with the
-predictive model and then use the G-squared values to indicate the strength
-of a relationship once I have identified interesting terms. Also, I find the
-G-squared value particularly useful when looking at the frequency of POS tags
-or dependency relationships between two groups.
+
+
+```{r}
+X <- token %>%
+  sm_ngram(n = 5, n_min = 1, doc_var = "doc_id", token_var = "upos") %>%
+  cnlp_utils_tf(
+    doc_set = us$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "token"
+  )
+dim(X)
+```
+
+```{r}
+X_train <- X[us$train_id == "train", ]
+y_train <- us$author[us$train_id == "train"]
+
+model <- cv.glmnet(
+  X_train,
+  y_train,
+  alpha = 0.9,
+  family = "multinomial",
+  nfolds = 3,
+  trace.it = TRUE,
+  relax = FALSE,
+  lambda.min.ratio = 0.01,
+  nlambda = 100
+)
+```
+
+```{r}
+us %>%
+  mutate(pred = as.vector(predict(model, newx = X, type = "class"))) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(author == pred))
+```

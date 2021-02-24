@@ -1,5 +1,5 @@
 ---
-title: "Notebook 09: N-Grams, Skip-Grams, and TF Covariates"
+title: "Notebook 09: More Model Features"
 output:
   html_document:
     theme: cosmo
@@ -14,210 +14,344 @@ library(ggrepel)
 library(smodels)
 library(cleanNLP)
 library(glmnet)
+library(magrittr)
 library(stringi)
-library(Matrix)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
+options(sparse.colnames = TRUE)
 ```
 
-```{r}
-library(tokenizers)
-library(tibble)
-```
+## Amazon Products
 
-## Spam, again
+As a good example dataset, let's again use the Amazon product classification
+data:
 
-For these notes, we will look again at the spam text message data. Here, we will
-load a version of the main data as well as the associated tokens parsed by the
-spacy library.
-
-```{r, message = FALSE}
+```{r, message=FALSE}
 set.seed(1)
 
-spam <- read_csv("data/spam.csv") %>%
+amazon <- read_csv("data/amazon_product_class.csv") %>%
   mutate(train_id = if_else(runif(n()) < 0.6, "train", "valid"))
-token <- read_csv("data/spam_token.csv.gz")
+token <- read_csv("data/amazon_product_class_token.csv.gz")
 ```
 
-Our goal will be seeing ways of creating different types of model matrices.
+Today we are going to discuss additional ways to construct your model matrix,
+building off of the techniques in the previous notebook. In the Notebook 8
+pipeline, these will replace or augment Step 2. Note that many of these will
+be useful only in a certain set of applications. It is generally good to start
+with raw frequencies and move to other options given the specific goals you
+have and the data you are working with.
 
-### N-gram
+### Adding Pronouns
 
-In using the TF matrix, we are ignoring all contextual information about how
-words are used in the documents. One way to alleviate this is to consider
-N-grams, counting combinations of words that occur one after one another. So,
-a 2-gram considers pairs of subsequent words, 3-grams triples, and so forth.
-To create N-grams we will use the function `sm_ngram`. We can provide the
-maximum length of the N-grams, as well as the minimum length. Here, we consider
-1- and 2-grams:
-
-```{r}
-token %>%
-  sm_ngram(n = 2, n_min = 1)
-```
-
-We can then use these N-grams as an input to our data matrix:
+The spaCy NLP pipeline converts all pronouns into a single lemma: "-PRON-". I
+have always found this strange, and it is often not great for the types of
+analysis we are doing with the lemmas. To fix this, we can replace every pronoun
+lemma with its lower case token. Looking at the first few columns of the data
+matrix, we see that some of the pronouns are quite common:
 
 ```{r}
 X <- token %>%
-  sm_ngram(n = 2, n_min = 1) %>%
-  cnlp_utils_tf(doc_set = spam$doc_id,
-                min_df = 0.005,
-                max_df = 1,
-                max_features = 10000,
-                token_var = "token")
+  mutate(lemma = if_else(upos == "PRON", stri_trans_tolower(token), lemma)) %>%
+  filter(upos %in% c("ADJ", "ADV", "NOUN", "VERB", "PRON")) %>%
+  cnlp_utils_tf(
+    doc_set = amazon$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "lemma"
+  )
+
+X[1:10, 1:15]
+```
+
+Using this in your model may improve the predictive power and show different
+writing strategies used in each category.
+
+### Sentence Number
+
+Another technique is to restrict the sentences used in creating the term
+frequency matrix. This code, for example, will look at just the first sentence
+in each document.
+
+```{r}
+X <- token %>%
+  filter(sid == 1) %>%
+  filter(upos %in% c("ADJ", "ADV", "NOUN", "VERB")) %>%
+  cnlp_utils_tf(
+    doc_set = amazon$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "lemma"
+  )
+```
+
+I find looking at the first 1 or 2 sentences can be useful when working with
+reviews. Often the first sentence gives the clearest signal of someone's
+sentiment towards a product, which is then clarified and refined later in the
+body of the review.
+
+With a slightly different approach, we can also look at the last sentence in
+each document:
+
+```{r}
+X <- token %>%
+  group_by(doc_id) %>%
+  filter(sid == max(sid)) %>%
+  filter(upos %in% c("ADJ", "ADV", "NOUN", "VERB")) %>%
+  cnlp_utils_tf(
+    doc_set = amazon$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "lemma"
+  )
+```
+
+This is often useful for looking at writing style, as particular people tend
+to end their reviews with similar language.
+
+### POS as a Feature
+
+The code we have so far can be easily changed to look at the frequency of
+linguistic features other than lemmas. For example, we could look at how often
+each part of speech is used in the reviews by changing the `token_var`
+component in the `cnlp_utils_tf` function.
+
+```{r}
+X <- token %>%
+  cnlp_utils_tf(
+    doc_set = amazon$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "upos",
+
+  )
+
+X[1:10, 1:10]
+```
+
+With part of speech codes, it is often also useful to look at relatively large
+N-grams. As there are fewer options for the part of speech codes, it is not
+unreasonable to look at 4- or even 5-grams.
+
+```{r}
+X <- token %>%
+  sm_ngram(n = 4, n_min = 1, doc_var = "doc_id", token_var = "upos") %>%
+  cnlp_utils_tf(
+    doc_set = amazon$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "token"
+  )
 
 dim(X)
 ```
 
-And fit a model, just as before:
+Looking at POS N-grams is usually most useful to isolating writing style, and
+is a good way of distinguishing one author from another.
 
-```{r}
-X_train <- X[spam$train_id == "train", ]
-y_train <- spam$class[spam$train_id == "train"]
+### Tagging Lemmas with POS
 
-model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
-```
-
-Looking at the coefficients, we see that most of the selected terms are
-1-grams (unigrams) but a few 2-grams (bigrams) show up such as "now !" and
-". call" (call as the start of a sentence).
-
-```{r}
-temp <- coef(model, s = model$lambda[25])
-beta <- Reduce(cbind, temp)
-beta <- beta[apply(beta != 0, 1, any),]
-colnames(beta) <- names(temp)
-beta
-```
-
-If you really want to focus on pairs or triples of words, consider removing the
-unigrams. Be careful including too many words, as the model matrix will become
-quite large. In my experience, N-grams do not generally provide a huge
-improvement to the predictive power of lemma-based models. However, they can be
-useful for finding interesting phrases. They will be very useful when we start
-looking at stylometry in a few weeks.
-
-### Skip grams
-
-A skip-gram is similar to an N-gram, however they count combinations of words
-that appear near one another with the possibility of having some terms between
-them. For example, skip-grams with N equal to 2 and a skip of 1 would consist
-of standard 2-grams as well as pairs of words seperated by a third. Here, for
-example is the 2-skip-gram with a skip (k) of 1:
-
-```{r}
-token %>%
-  sm_skip_ngram(n = 2, n_min = 2, k = 1)
-```
-
-As with N-grams, we can use these to construct a TF matrix:
+Often a single lemma can be the same for different parts of speech, such as
+the noun "love" and the verb "love". We can treat these as different by
+combining the lemma and the part of speech together into a single variable
+and using this as the thing we are counting in the data matrix.
 
 ```{r}
 X <- token %>%
-  sm_skip_ngram(n = 2, n_min = 2, k = 1) %>%
-  cnlp_utils_tf(doc_set = spam$doc_id,
-                min_df = 0.005,
-                max_df = 0.5,
-                max_features = 10000,
-                token_var = "token")
+  mutate(lemma = if_else(upos == "PRON", stri_trans_tolower(token), lemma)) %>%
+  mutate(lemma = sprintf("%s_%s", lemma, upos)) %>%
+  filter(upos %in% c("ADJ", "ADV", "NOUN", "VERB", "PRON")) %>%
+  cnlp_utils_tf(
+    doc_set = amazon$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "lemma"
+  )
 
-dim(X)
+X[1:10, 1:8]
 ```
 
-And fit a model based on them:
+I rarely find that this makes a significant difference in the predictiveness of
+the model, but it does help interpret the coefficients by understanding the
+correct meaning of the lemma. For example, above we know that "will" is the
+modal verb ("I will be late") and not the noun ("He had the will to carry on").
+
+### Scaling the Counts
+
+Another way to modify the features in your data is to change how the term
+frequencies are scaled. By default, we just use raw counts, but can change the
+option `tf_weight` to "binary" to convert every word into a 0/1 indicator
+variable:
 
 ```{r}
-X_train <- X[spam$train_id == "train", ]
-y_train <- spam$class[spam$train_id == "train"]
+X <- token %>%
+  filter(upos %in% c("ADJ", "ADV", "NOUN", "VERB")) %>%
+  cnlp_utils_tf(
+    doc_set = amazon$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "lemma",
+    tf_weight = "binary"
+  )
 
-model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
+X[1:10, 1:15]
 ```
 
-Note that the model puts the same weight on a pair of words regardless of
-whether the words appear next to one another or seperated by another word.
-Here are the coefficents:
+This can be useful to compare texts of different lengths and to avoid focusing
+the model on very common words (without the need to a hard cut-off).
+
+### Manual Features from Tokens
+
+Another way to modify the available features for analysis is to construct a
+set of individual features from the token table. For example, we can compute
+the type token ratio (number of unique words divided by the number of all
+words), the number of sentences, and the number of words in each document.
+I will also compute the frequency of the lemma "that" just to show how this
+can be compared to the TF matrix.
 
 ```{r}
-temp <- coef(model, s = model$lambda[15])
-beta <- Reduce(cbind, temp)
-beta <- beta[apply(beta != 0, 1, any),]
-colnames(beta) <- names(temp)
-beta
+token_summary <- token %>%
+  group_by(doc_id) %>%
+  filter(!is.na(lemma)) %>%
+  summarize(
+    type_token_ratio = length(unique(lemma)) / n(),
+    num_sentences = max(sid),
+    num_tokens = n(),
+    num_word_that = sum(lemma == "that")
+  )
 ```
 
-We see several interesting tokens pop up, such as "win £" "£ cash", and
-"to claim". Which do you think are likely skip-grams and which are probably
-plain 2-grams?
+One thing that is nice about this data is that we can visualize it on its own,
+without needing a predictive model:
 
-### Co-variates
+```{r, message=FALSE}
+amazon %>%
+  inner_join(token_summary, by = "doc_id") %>%
+  group_by(category) %>%
+  summarize(sm_mean_ci_normal(type_token_ratio)) %>%
+  arrange(desc(type_token_ratio_mean)) %>%
+  ggplot() +
+    geom_pointrange(aes(
+      x = category,
+      y = type_token_ratio_mean,
+      ymin = type_token_ratio_ci_min,
+      ymax = type_token_ratio_ci_max
+    ))
+```
 
-A third way of modifying the model matrix is to include a small set of
-additional features into the matrix along with the word counts. Typically
-these come from additional metadata from our corpus. However, they can also
-come from hand-constructed features from the texts. For example, let's start
-with a set of term frequencies:
+Of course, we can also put this into a model matrix:
 
 ```{r}
-X_tf <- token %>%
-  cnlp_utils_tf(doc_set = spam$doc_id,
-                min_df = 0.005,
-                max_df = 0.5,
-                max_features = 10000)
+X_cov <- amazon %>%
+  select(doc_id, category) %>%
+  left_join(token_summary, by = "doc_id") %>%
+  model.frame(category ~ type_token_ratio + num_sentences + num_tokens -1, data = .) %>%
+  model.matrix(attr(., "terms"), .)
+
+head(X_cov)
 ```
 
-But then, we can add manual counts of the number of capital letters and numbers
-in each text as addition variables and create a model matrix using the
-`model.matrix` function.
+And use in alone or along-side other predictors.
+
+### Word Frequency
+
+The final new feature type we will see today uses a new dataset that is
+included anytime you load the **cleanNLP** package. It is called
+`word_frequency`, and give the frequency of different words over a large
+corpus of website texts:
 
 ```{r}
-mf <- spam %>%
-  mutate(cnt_caps = stri_count(text, regex = "[A-Z]")) %>%
-  mutate(cnt_nums = stri_count(text, regex = "[0-9]")) %>%
-  model.frame(class ~ cnt_caps + cnt_nums, data = .)
-mt <- attr(mf, "terms")
-y <- model.response(mf)
-X_cov <- model.matrix(mt, mf)
+word_frequency
 ```
 
-Then, we combine the two matrices together using the function `cbind`:
+We can use this to remove very common words from our TF matrix as follows:
 
 ```{r}
-X <- cbind(X_cov, X_tf)
+X <- token %>%
+  mutate(lemma = if_else(upos == "PRON", stri_trans_tolower(token), lemma)) %>%
+  filter(upos %in% c("ADJ", "ADV", "NOUN", "VERB", "PRON")) %>%
+  semi_join(
+    filter(word_frequency, frequency < 0.001), by = c("lemma" = "word")
+  ) %>%
+  cnlp_utils_tf(
+    doc_set = amazon$doc_id,
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "doc_id",
+    token_var = "lemma"
+  )
+
+X[1:10, 1:11]
 ```
 
-Once we have this matrix (which should still be sparse), we can fit the model
-as usual:
+Another, somewhat more interesting, usage of word frequencies is to use them
+as a meta-feature in understanding word usage within different documents.
+To start, let's break the word frequencies into 10 buckets according to their
+overall frequency (so in theory, each bucket will occur in roughly the same
+proportion):
 
 ```{r}
-X_train <- X[spam$train_id == "train", ]
-y_train <- spam$class[spam$train_id == "train"]
-
-model <- cv.glmnet(X_train, y_train, alpha = 0.2, family = "multinomial")
+ngroups <- 10
+freq_b <- word_frequency %>%
+  mutate(cum_freq = cumsum(frequency)) %>%
+  mutate(bucket = cut(
+    cum_freq,
+    breaks = seq(0, 100, length.out = ngroups + 1),
+    labels = FALSE,
+    include.lowest = TRUE
+  ))
+freq_b
 ```
 
-Unsurprisingly, the hand-constructed features show up in the list of
-coefficients:
+Then, we can assign each lemma to one of the frequencies and count how often
+each bucket is used in each document:
 
 ```{r}
-temp <- coef(model, s = model$lambda[15])
-beta <- Reduce(cbind, temp)
-beta <- beta[apply(beta != 0, 1, any),]
-colnames(beta) <- names(temp)
-beta
+token_summary <- token %>%
+  inner_join(freq_b, by = c("lemma" = "word")) %>%
+  group_by(doc_id, bucket) %>%
+  summarize(sm_count()) %>%
+  mutate(count = count / sum(count) * 100) %>%
+  ungroup() %>%
+  pivot_wider(
+    names_from = "bucket",
+    names_prefix = "bucket_",
+    values_from = "count",
+    names_sort = TRUE,
+    values_fill = 0
+  )
+
+token_summary
 ```
 
-Also, we see that the predictive power of the model increases compared to the
-word-based only model.
+And then this can be used as a set of features:
 
 ```{r}
-spam %>%
-  mutate(pred = predict(model, newx = X, type = "class")) %>%
-  group_by(train_id) %>%
-  summarize(class_rate = mean(class == pred))
+X_cov <- amazon %>%
+  select(doc_id, category) %>%
+  left_join(token_summary, by = "doc_id") %>%
+  select(-doc_id) %>%
+  model.frame(category ~ . -1, data = .) %>%
+  model.matrix(attr(., "terms"), .)
+
+X_cov[1:10, 1:6]
 ```
 
-Adding additional metadata into the model is an easy way to account for nusiance
-variables and is something we will see in the next project.
+You can change the number of buckets, or collapse some of the most frequent
+ones. These are often useful features to use when looking at writing style.
