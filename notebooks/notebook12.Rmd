@@ -96,7 +96,7 @@ that included many non-food related articles?
 ## Documents as Vectors: Illustration
 
 This section illustrates a concept that will be very useful in the final two
-sections of this chapter. Note, however, that there is generally no need to
+sections. Note, however, that there is generally no need to
 include this in your own analysis of textual data.
 
 The TF-IDF data set is an example of a long-format data set. Conceptually, we

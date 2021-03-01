@@ -65,8 +65,8 @@ We could plug this data matrix into a penalized regression model, and it would
 likely perform relatively well. However, today we will use it to illustrate a
 different class of models, which I call *local models*. Whereas regression tries
 to learn specific weights attached to each variable, local models focus on
-make predictions base on the training data most similar to the point where one
-wants to make a prediction.
+making predictions based on the training data most similar to the point where
+one wants to make a prediction.
 
 We will discuss three different local models and then step-back to talk about
 their relative strengths and weaknesses compared to *global* models that are
@@ -121,7 +121,7 @@ stylo %>%
 ```
 
 I don't see any particularly strong patterns here, though it does seem that
-Jane Austin is a bit easier to distinguish that the other four authors.
+Jane Austin is a bit easier to distinguish than the other four authors.
 
 We can modify the model by increasing the number of neighbors under
 consideration. We can try 10 here, for example:
@@ -188,7 +188,7 @@ Then we train the k-th tree on the values Z given by:
 $$ Z_i = Y_i - \eta \cdot \sum_{t = 1}^{k - 1} \widehat{Y_i^t} $$
 
 The parameter eta is the learning rate. If set to one, this is exactly fitting
-on the residuals of the prior trees. Setting to less than one stop the trees
+on the residuals of the prior trees. Setting to less than one stops the trees
 from overfitting on the first few trees.
 
 The details for classification tasks are a bit more complex, but the general
@@ -234,7 +234,8 @@ model <- xgb.train(data = data_train,
 You can see that the function prints out the training and validation error
 rates (1 minus the classification rate) after each step. We can do slightly
 better by decreasing the learning rate and increasing the number of trees. I
-will turn off (`verbose = FALSE`) the print out given larger number of trees.
+will turn off (`verbose = FALSE`) the print out due to the larger number of
+trees.
 
 ```{r}
 model <- xgb.train(data = data_train,
