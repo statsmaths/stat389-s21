@@ -1,5 +1,5 @@
 ---
-title: "Notebook 10: Part of Speech as Feature"
+title: "Notebook 10: Text Processing in the 'Real World'"
 output:
   html_document:
     theme: cosmo
@@ -20,99 +20,18 @@ options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
 
-## Part of Speech as Feature
+## Applications of all this stuff
 
-For today's notes, let's use the U.S. Authors data set.
-
-```{r, message = FALSE}
-us <- read_csv(file.path("data", "stylo_us.csv"))
-token <- read_csv(file.path("data", "stylo_us_token.csv.gz"))
-```
-
-
-
-```{r}
-X <- token %>%
-  cnlp_utils_tf(
-    doc_set = us$doc_id,
-    min_df = 0.001,
-    max_df = 1.0,
-    max_features = 10000,
-    doc_var = "doc_id",
-    token_var = "upos"
-  )
-```
-
-```{r}
-X_train <- X[us$train_id == "train", ]
-y_train <- us$author[us$train_id == "train"]
-
-model <- cv.glmnet(
-  X_train,
-  y_train,
-  alpha = 0.9,
-  family = "multinomial",
-  nfolds = 3,
-  trace.it = TRUE,
-  relax = FALSE,
-  lambda.min.ratio = 0.01,
-  nlambda = 100
-)
-```
-
-
-```{r}
-us %>%
-  mutate(pred = as.vector(predict(model, newx = X, type = "class"))) %>%
-  group_by(train_id) %>%
-  summarize(class_rate = mean(author == pred))
-```
-
-
-```{r}
-temp <- coef(model, s = model$lambda[15])
-beta <- Reduce(cbind, temp)
-beta <- beta[apply(beta != 0, 1, any),]
-colnames(beta) <- names(temp)
-beta
-```
+Now that we are through the first project, I thought it would be helpful to
+take a quick step back and talk about the big picture. Why it is important
+to understand the material in this class if you are interesting in working
+in statistics or data data science? If you are interested in doing research
+in natural language processing, linguistics, or a related field, hopefully the
+answer is fairly obvious. Otherwise,
 
 
 
-```{r}
-X <- token %>%
-  sm_ngram(n = 5, n_min = 1, doc_var = "doc_id", token_var = "upos") %>%
-  cnlp_utils_tf(
-    doc_set = us$doc_id,
-    min_df = 0.001,
-    max_df = 1.0,
-    max_features = 10000,
-    doc_var = "doc_id",
-    token_var = "token"
-  )
-dim(X)
-```
 
-```{r}
-X_train <- X[us$train_id == "train", ]
-y_train <- us$author[us$train_id == "train"]
 
-model <- cv.glmnet(
-  X_train,
-  y_train,
-  alpha = 0.9,
-  family = "multinomial",
-  nfolds = 3,
-  trace.it = TRUE,
-  relax = FALSE,
-  lambda.min.ratio = 0.01,
-  nlambda = 100
-)
-```
 
-```{r}
-us %>%
-  mutate(pred = as.vector(predict(model, newx = X, type = "class"))) %>%
-  group_by(train_id) %>%
-  summarize(class_rate = mean(author == pred))
-```
+## Feedback from Project 1
