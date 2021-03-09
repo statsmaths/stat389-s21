@@ -22,6 +22,7 @@ options(dplyr.summarise.inform = FALSE)
 ```{r, message=FALSE}
 dname <- ""  # put the name assigned to your group here
 
+dir.create("data", showWarnings = FALSE)
 url_base <- "https://statsmaths.github.io/data-amazon/class"
 f_corpus <- file.path("data", sprintf("%s.csv.gz", dname))
 f_tokens <- file.path("data", sprintf("%s_token.csv.gz", dname))

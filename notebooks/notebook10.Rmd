@@ -1,5 +1,5 @@
 ---
-title: "Notebook 10: Text Processing in the 'Real World'"
+title: "Notebook 10: Mid-Course Thoughts"
 output:
   html_document:
     theme: cosmo
@@ -22,16 +22,94 @@ options(width = 77L)
 
 ## Applications of all this stuff
 
-Now that we are through the first project, I thought it would be helpful to
-take a quick step back and talk about the big picture. Why it is important
-to understand the material in this class if you are interesting in working
-in statistics or data data science? If you are interested in doing research
-in natural language processing, linguistics, or a related field, hopefully the
-answer is fairly obvious. Otherwise,
+Now that we are through the first project and about halfway through the
+semester, I thought it would be helpful to take a quick step back and put
+into perspective what we have learned so far.
 
+Hopefully it is fairly clear that if you want to work in a field that performs
+data analysis, it is generally useful to understand the basic terminology of
+predictive models and how to present this information in a short but informative
+way. I also hope that you feel that the structure of the course has helped
+teach you some of these basics and give space to practice and hone your skills
+actually applying and presenting the results.
 
+What might be less obvious is why some of the specific techniques we are
+looking at may be useful in your future endeavours outside of research
+in natural language processing, linguistics, or a related field.
 
+To help motivate the more general applicability of these techniques to various
+fields, now that you know the basics, here are four concrete reasons that the
+approaches for text analysis we are learning may be more directly useful than
+expected:
 
+1. **Lots of variables** The distinguishing feature of our core set of models
+(penalized regression) is the need to do regression of multi-class
+classification when there are a very large number of variables. This is a very
+common problem in many (most?) domains. For example: genetics, engineering,
+marketing, accounting, finance, operations research, and supply chain
+management. Text is a good example to work with in class because the features
+and results should be familiar to anyone familiar with the English language.
+Most of the other examples require understanding a lot of domain knowledge
+that will not be common to everyone in the class.
+2. **Feature Construction** In order to do text analysis we need to construct
+features; they are not given to us directly. Some can be created directly from
+the data, but most often useful features come from selectively summarizing the
+data from the tokens table. Again, this is very common in industry and research
+applications, where the most interesting data points are observered at a
+different frequency or unit of measurement than the response variable. For
+example, think of computing a credit score based on summary statistics selected
+from a person's financial history or determining a patient's prognosis based on
+a history of medical records and lab reports. As with the lots of variables
+point, text is just a useful example of this kind of analysis that does not
+require specialized domain knowledge.
+3. **Text is actually quite common** A surprising amount of data being produced
+and analyzed in industry and research applications contains at least some free
+text fields. Think, for example, of trying to detect indicators of fraud when
+investigating a collection emails, or automatically detecting themes or
+signaling problems by doing text analysis on call center logs. In the age of
+large datasets, the amount of free text used in all kinds of applications will
+likely only grow. Being able to know the specific techniques to work with is
+just another benefit of focusing on textual data.
+4. **False Binary: Supervised/Unsupervised** We have not yet talked about
+unsupervised learning, a kind of machine learning that is not focused
+on predictive models. This will be the focus on Project 3 and Project 4. Text
+datasets lend themselves to both modes of analysis simultaneously; this is
+another common feature of real-world applications that is often lost in other
+textbook examples of machine learning applications.
 
+I hope that these examples help show further links between and
+possible applications of what we are learning in class. It should also be
+mentioned that I find working with textual data to also be just a bit more fun
+(at least, for most of us) than orienting the class around other tabular
+datasets.
 
-## Feedback from Project 1
+## Feedback from Project 1 and looking towards Project 2
+
+I was overall very impressed with the presentations for the first project.
+There were virtually no major mistakes and it was clear that a lot of time and
+energy went into the project. I really appreciate that and hope it was a
+productive and not-to-painful (or even enjoyable?) experience. I have called
+out specific things to keep in mind for the second project, mostly minor things,
+in your feedback. I am happy to discuss further in your breakout groups today.
+
+The second project has the same general instructions and format, but the data
+and classification task has a larger scope. You'll need to be more careful to
+focus your final analysis on just a small set of interesting things. I am
+**not** evaluating the scope of what you did, but rather how well you were able
+to tell a story about something interesting in the data. I recommend the
+following rough schedule:
+
+- Today, have everyone download the data and start building a few models.
+Discuss as a group what you are seeing and perhaps break out different tasks
+for each of you to look at for next week.
+- In class next Tuesday, after my notes on a new ML technique, talk about the
+different results and formulate a plan for what big things you want to focus on
+for the project write-up and presentation.
+- In class next Thursday, after my notes on another new ML technique, make a
+plan to put the different pieces together. Take note and ask about other
+visualizations or other things you'd like to do with the data that you may not
+be obvious from my notes.
+
+My guess is that you will find Project 2 much harder. We will built out more
+techniques for working with this kind of data as we head into Project 3. Just
+do your best with the tools we have at hand!
