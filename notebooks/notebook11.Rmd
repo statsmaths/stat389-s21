@@ -48,14 +48,14 @@ regression. We have seen that we can extend this model in a number of ways.
 Using a link function produced generalized linear regression, allowing us to
 do classification with logistic regression. Parameter expansion extends the
 linear regression model to cases where there are interactions or non-linear
-relationships between variables. Adding a penalty term produces estimators 
+relationships between variables. Adding a penalty term produces estimators
 such as the lasso, ridge, and elastic net estimators. All of these allow for
 working with a large collection of variables without overfitting to the training
 data.
 
 We could continue on this trend and learn even more extensions of linear
-regression. Linear discriminant analysis and support vector machines, for 
-example, can be derived as a geometric extension of logistic regression. 
+regression. Linear discriminant analysis and support vector machines, for
+example, can be derived as a geometric extension of logistic regression.
 Fixed and mixed effects models allow for more control in the way that correlated
 observations are used in training. Generalized additive models provide a more
 complete and adaptive form of feature expansion for find non-linear
@@ -67,7 +67,7 @@ fundamental way. Weights are assigned to each feature variable (column of X)
 and the final prediction is determined by combining all of these effects
 together. I call all of these **global models**. We could spend more time
 learning more examples, but I think there are diminishing returns. It is
-unlikely the other alternatives will produce consistently better estimators 
+unlikely the other alternatives will produce consistently better estimators
 than the ones we have already learned.
 
 What I want instead to spend time looking at this week are **local models**.
@@ -133,7 +133,7 @@ well your other models are working. It has a very different approach and is
 best when given a relatively dense matrix (as above, lot's of non-zeros) and
 particularly good when there are tricky interactions that are hard to get with
 global models. There is not much more that we can do with it here, though. Next
-time we will see a different local model that produces more interesting 
+time we will see a different local model that produces more interesting
 importance scores that can help describe the most important variables in a
 local model approach.
 
@@ -141,7 +141,7 @@ local model approach.
 
 ### Better coefficents
 
-You may have notices that some of the users in some of the data sets change 
+You may have notices that some of the users in some of the data sets change
 their user names, so you'll get better predictions using `user_id`. However,
 it is nice to make visualizations with the full names, which are a bit more
 interesting. I will make a look-up table here:
@@ -281,7 +281,7 @@ amazon %>%
   arrange(desc(word_cnt_sum)) %>%
   mutate(user_name = fct_inorder(user_name)) %>%
   ggplot(aes(word_cnt_sum, user_name)) +
-    geom_point() 
+    geom_point()
 ```
 
 Or symphonies:
@@ -298,8 +298,8 @@ amazon %>%
   arrange(desc(word_cnt_sum)) %>%
   mutate(user_name = fct_inorder(user_name)) %>%
   ggplot(aes(word_cnt_sum, user_name)) +
-    geom_point() 
+    geom_point()
 ```
 
-So, maybe, you will find these helpful in telling a story about some of the 
+So, maybe, you will find these helpful in telling a story about some of the
 users in your dataset and which are difficult to tell apart.

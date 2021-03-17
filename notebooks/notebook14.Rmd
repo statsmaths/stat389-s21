@@ -1,5 +1,5 @@
 ---
-title: "Notebook 14: Latent Dirchlet Allocation (LDA)"
+title: "Notebook 14: Cluster Analysis"
 output:
   html_document:
     theme: cosmo
@@ -12,239 +12,173 @@ library(tidyverse)
 library(forcats)
 library(ggrepel)
 library(smodels)
-library(cleanNLP)
-library(topicmodels)
 library(magrittr)
+library(cleanNLP)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
 
-## Creating a Corpus of Wikipedia Documents
+## Clustering Food Data
 
-For Project 4, unlike the other projects, you will be constructing your own
-corpus of documents to work with. These documents will come from the text of
-Wikipedia articles. The functions needed to do this can be loaded by reading
-in the `wiki.R` script:
-
-```{r}
-source("wiki.R")
-```
-
-The function `wiki_get_pages` takes a vector of page names, queries the
-MediaWiki API, and returns a data frame with the HTML parsed version of
-the page, as well as information about all internal links included in the
-page. Here, we will use it to grab the pages "Coffee" and "Tea". Note that
-the function requires that you set the language of Wikipedia that you are
-interested in grabbing data from.
-
-```{r}
-pages <- wiki_get_pages(c("Coffee", "Tea"), lang = "en")
-pages
-```
-
-The functions are smart and create a local cache of files that avoids having
-to query the API over and over again.
-
-Now, we will use the function `wiki_expand_pages` to grab all of the pages
-that are linked to from the pages in the data frame `pages`. That is, returning
-data for all pages that are linked to from the Coffee or Tea pages. Be careful
-with this data set! RStudio has trouble displaying the raw text in the resulting
-data frame and will likely crash if you try to print out all of the columns or
-open the data in the view finder. It's better to just print out the page and
-lang variables
-
-```{r}
-exp_pages <- wiki_expand_pages(pages)
-select(exp_pages, page, lang)
-```
-
-We now have a corpus of 1131 pages. Finally, we will use the function
-`wiki_get_pages_text` to extract the raw text from the Wikipedia files.
-This requires parsing all of the HTML records and can take a minute or
-two to finish running, but note that it does not grab any additional data
-from the MediaWiki API. As with the previous data set, do not try to print
-out all of the columns of the data in R.
-
-```{r}
-wiki <- wiki_get_pages_text(exp_pages)
-select(wiki, page, sec_num, section)
-```
-
-Notice that the corpus now contains over 41 thousand documents because it
-extracts each paragraph as an individual document. It also includes the
-section number and title associated with each page. These can be useful for
-many analyses, but we will not make use of them right now. We can instead
-roll-up the pages so that each row of the data set contains only one page.
-
-```{r}
-wiki <- tapply(wiki$text, wiki$page, paste, collapse = " ")
-wiki <- tibble(doc_id = names(wiki), text = as.character(wiki))
-dim(wiki)
-```
-
-Finally, we need to run the NLP annotation engine over this data set. Here is
-the code to run and save the results using the **udpipe** backend:
-
-```{r, eval=FALSE, message=FALSE, warning=FALSE}
-cnlp_init_udpipe("english")
-anno <- cnlp_annotate(wiki)$token
-
-write_csv(wiki, file.path("data", "wiki_coffee_tea.csv"))
-write_csv(token, file.path("data", "wiki_coffee_tea_token.csv.gz"))
-```
-
-The saved results can then be read-in and used without having to re-create the
-data set. We will use this data in several of our upcoming notebooks.
-
-```{r, eval=FALSE, echo=FALSE}
-library(reticulate)
-use_virtualenv("/Users/admin/gh/stat389-s21/env", required = TRUE)
-cnlp_init_spacy("en_core_web_sm")
-anno <- cnlp_annotate(wiki)
-
-token <- anno$token
-entity <- anno$entity
-
-write_csv(wiki, file.path("data", "wiki_coffee_tea.csv"))
-write_csv(token, file.path("data", "wiki_coffee_tea_token.csv.gz"))
-write_csv(entity, file.path("data", "wiki_coffee_tea_entity.csv.gz"))
-```
-
-## Latent Dirchlet Allocation
-
-We will now proceed to the methodological topic for today. For consistency,
-let's read back in the Wikipedia data and tokens files.
+For these notes, we will read in the same food Wikipedia pages that we started
+looking at last time.
 
 ```{r, message=FALSE}
-wiki <- read_csv(file.path("data", "wiki_coffee_tea.csv"))
-token <- read_csv(file.path("data", "wiki_coffee_tea_token.csv.gz"))
+food <- read_csv("data/food_page.csv")
+token <- read_csv("data/food_page_token.csv.gz")
 ```
 
-Today we are going to investigate a method for *topic modeling*. This is an
-unsupervised task that seeks to identify topics within a corpus of text. What
-exactly is a topic? Mathematically speaking, it is usually defined as a
-probability distribution over a collection of words. Words that have a high
-probability within a topic tend to classify the topics themes in a colloquial
-sense. For example, a topic that captures the idea of baseball would have high
-probabilities on words such as "base", "player", "strike", "umpire", "team",
-and so forth.
+We will add just one more addition to the data that we saw last time: grouping
+the documents into clusters. Clustering a corpus of texts can help understand
+the structure and themes described in the corpus. With clustering, we are
+using an *unsupervised* machine learning technique, compared to the *supervised*
+approaches that dominated the earlier notes.
 
-We will be use a model today called Latent Dirchlet Allocation, or more commonly
-LDA. Given a fixed number of topics and fixed set of words (called a *lexicon*),
-LDA assumes that documents consist of a random collection of words
-constructed according to the following model:
+To do clustering with our text data today, we will cluster the first several
+principle components of the TF-IDF matrix. The clustering algorithm that we
+will use is called k-means. It is an iterative algorithm that works as follows:
 
-1. Each document is randomly partitioned into topics. For example, one document
-may be 20% in Topic A, 70% in Topic B, and 1% in the remaining 10 topics.
-2. Each topic is similarly assigned as a probability distribution of all the
-available words.
-3. When choosing words to create a document, pick a topic at random
-proportional to the topic distribution of the document, and then pick a word
-proportional to the chosen topic.
-4. The number of words in each document is assumed to be fixed, and there is
-assumed to be no relationship between the words in each document.
+1. Pick the number of clusters N that you want to detect.
+2. Randomly choose N data points as the starting centers of each cluster.
+3. Compute the distance of every data point to the centers of the current
+clusters.
+4. Assign each data point to the cluster whose center it is closest.
+5. Re-compute the cluster centers as the average value of all the points in a
+cluster.
+6. Take the new cluster centers, and repeat the process (computer distances,
+reassign to groups, and recompute the centers) iteratively until convergence.
 
-This model is a great example of the adage that "all models are wrong, but
-some are useful". Clearly, this is not how documents are constructed, and
-words are not independent of one another. However, the approximation is close
-enough to produce a useful abstraction for detecting themes within a corpus of
-textual documents.
+The algorithm is not entirely deterministic because of the random starting
+points. Typically, the algorithm is run several times and the "best" clustering
+is chosen. How do we define the "best" in the case of a clustering algorithm?
+A typical method is to measure the sum of squared distances to the cluster
+centers, a quantity that a good clustering will minimize.
 
-You will notice that the description above is in some ways backwards from
-reality. It assumes that we know the distribution of the topics over the words
-and documents but do not know what words are present in the documents. In fact,
-we know the words but not the topics! This is an example of a Bayesian model.
-If we wrote down the assumptions rigorously, we could invert the probabilities
-using Bayes' Theorem. That is, instead of knowing the probability of the
-documents given the topics, we can determine the probability of the topics given
-the documents. It is not possible to do this analytically, however, and a
-simulation method is needed to figure out what distribution of topics over the
-words and documents is most likely to have produced the observed data.
-
-As a final note about the method, the name comes from the standard distribution
-used to determine the topics (the Dirichlet distribution) and the fact that the
-topics themselves are never observed (that is, the are *latent*).
-
-Now, let's actually compute an LDA topic model. The first step in creating a
-topic model is to compute a TF matrix. I tend to use only nouns, adjectives and
-adverbs for this task (verbs are okay too, if you would like).
+To compute k-means clustering, we can use the `sm_kmeans` function. Notice that
+the algorithm requires setting the number of clusters; often this takes a bit
+of guesswork and trial and error.
 
 ```{r}
-X <- token %>%
-  filter(upos %in% c("NOUN", "ADJ", "ADV")) %>%
-  cnlp_utils_tf(min_df = 0.001, max_df = 0.5, doc_set = wiki$doc_id)
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 2) %>%
+  sm_kmeans(clusters = 3)
 ```
 
-Next, we use the `sm_lda_topics` function. It requires passing the TF matrix
-as well as selecting the number of topics. Because this requires a simulation
-method, running the topic model can take a few minutes to complete. The results
-should be consistent from run to run because I have set the random seed inside
-of the implementation. The output contains two components, which we will save
-as individual data frames.
+Notice that the output gives the principle components as well as the cluster id.
+Note that order of the clusters is not important; it is only important which
+set of documents are in the same cluster.
+
+We can visualize the way the algorithm works by plotting the two principle
+components along with the cluster id:
+
+```{r, warning=FALSE}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 2) %>%
+  sm_kmeans(clusters = 3) %>%
+  ggplot(aes(v1, v2)) +
+    geom_point(aes(color = factor(cluster))) +
+    scale_color_viridis_d()
+```
+
+Putting the page labels on the plot shows the clustering does group similar
+pages together (all of the meats and seafoods are grouped together in a single
+cluster).
+
+```{r, warning=FALSE}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 2) %>%
+  sm_kmeans(clusters = 3) %>%
+  ggplot(aes(v1, v2)) +
+    geom_point(aes(color = factor(cluster))) +
+    geom_text_repel(
+      aes(label = document, color = factor(cluster)), show.legend = FALSE
+    ) +
+    scale_color_viridis_d() +
+    labs(color = "Cluster") +
+    theme_void()
+```
+
+It can, particularly when looking at more PCA dimensions or large datasets,
+also be useful to just look at the documents in each cluster as a table.
 
 ```{r}
-topic_model <- sm_lda_topics(X, num_topics = 16)
-topic_docs <- topic_model$docs
-topic_terms <- topic_model$terms
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 2) %>%
+  sm_kmeans() %>%
+  group_by(cluster) %>%
+  summarize(sm_paste(document)) %>%
+  use_series(document_paste)
 ```
 
-The first data frame provides the probability distributions of the documents.
-It tells us own much weight each document receives from each topic.
+And then we can look at what happens when the number of clusters increases:
 
 ```{r}
-topic_docs
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 2) %>%
+  sm_kmeans(cluster = 10) %>%
+  group_by(cluster) %>%
+  summarize(sm_paste(document)) %>%
+  use_series(document_paste)
 ```
 
-Looking at the documents with the highest probability for each topic begins to
-show what the LDA algorithm has found in each topic. Can you categorize what
-themes some of these topics capture?
+Or the number of PCA dimensions:
 
 ```{r}
-topic_docs %>%
-  arrange(topic, desc(prob)) %>%
-  group_by(topic) %>%
-  slice_head(n = 10) %>%
-  group_by(topic) %>%
-  mutate(doc_id = paste(topic, doc_id, sep = " => ")) %>%
-  use_series(doc_id)
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 10) %>%
+  sm_kmeans(cluster = 10) %>%
+  group_by(cluster) %>%
+  summarize(sm_paste(document)) %>%
+  use_series(document_paste)
 ```
 
-Similarly, the terms data frame gives the probability distribution of the terms.
-These probabilities can be quite small; rather than giving then on a raw scale,
-the function returns the logarithm of the probability in the column named
-`beta` (for this reason, these values are all negative).
+The latter set of clusters does a great job of grouping together similar food
+items. Often you will find that including a few dozen PCA components provides
+a better fit (though it is rarely useful to use the entire TF-IDF). We can
+plot this clustering as well, but note that the clusters are harder to see
+because they are formed in 10-dimensions but plotted in 2.
+
+```{r, warning=FALSE, message=FALSE}
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_pca(n = 3) %>%
+  sm_kmeans(cluster = 10) %>%
+  ggplot(aes(v1, v2)) +
+    geom_point(aes(color = factor(cluster))) +
+    geom_text_repel(
+      aes(label = document, color = factor(cluster)), show.legend = FALSE
+    ) +
+    labs(color = "Cluster") +
+    theme_void()
+```
+
+Finally, we can also run clustering on other dimension reduction algorithms.
+For example, we can cluster the items after applying the UMAP algorithm.
 
 ```{r}
-topic_terms
+token %>%
+  cnlp_utils_tfidf(token_var = "lemma", doc_set = food$doc_id) %>%
+  sm_tidy_umap(n = 2) %>%
+  sm_kmeans(cluster = 10) %>%
+  ggplot(aes(v1, v2)) +
+    geom_point(aes(color = factor(cluster))) +
+    geom_text_repel(
+      aes(label = document, color = factor(cluster)), show.legend = FALSE
+    ) +
+    labs(color = "Cluster") +
+    theme_void()
 ```
 
-Looking at words for each topic gives another view for understanding the
-detected topics. In many applications, we do not have useful titles of
-the documents, and using the word distributions is the only automatic way of
-describing each topic.
-
-```{r}
-topic_terms %>%
-  arrange(topic, desc(beta)) %>%
-  group_by(topic) %>%
-  slice_head(n = 10) %>%
-  group_by(topic) %>%
-  summarize(sm_paste(token))
-```
-
-How do these match up with the topics that you identified by the document
-names?
-
-## Visualizing Topics Models
-
-```{r}
-source("topic.R")
-```
-
-
-```{r}
-topic_json <- topics_create_json(topic_docs, topic_terms, wiki, truncate = 1000L)
-write_json(topic_json, "wiki-topics.json")
-```
+I find that the specific clusters from UMAP are not quite as good for TF-IDF
+matrices for finding exact, clean breaks between groups. However, they are
+great at creating small groups that can be manually combined or used in
+down-stream tasks. UMAP is also very powerful when working with image data,
+something out of scope for this semester but useful to know all the same.
