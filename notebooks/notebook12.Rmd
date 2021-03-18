@@ -45,15 +45,68 @@ X <- token %>%
                 token_var = "lemma")
 ```
 
+It will be useful for reference later to have a sense of how well a penalized
+regression model performs on this data:
+
+```{r}
+model <- cv.glmnet(
+  X[amazon$train_id == "train", ],
+  amazon$user_id[amazon$train_id == "train"],
+  alpha = 0.9,
+  family = "multinomial",
+  nfolds = 3,
+  trace.it = FALSE,
+  relax = FALSE,
+  lambda.min.ratio = 0.01,
+  nlambda = 100
+)
+
+amazon %>%
+  mutate(pred = as.vector(predict(model, newx = X, type = "class"))) %>%
+  group_by(train_id) %>%
+  summarize(class_rate = mean(user_id == pred))
+```
+
+
+
 Today we will continue our study of local models by looking at a very powerful
 model based on an adaptive form of KNN.
 
 ### Decision Trees
 
 Before we get to the main model today, we need to understand an intermediate
-model called a *decision tree*. Because we are not going to use these models
-directly (there is no good R package for running simple decision trees), let's
-look at this model using this resource:
+model called a *decision tree*. There is no good R package for running simple
+decision trees for multiclass regression, so we will not actually run this
+model in R. Instead, we will just discuss how the model works. I will explain
+this in the case that we are predicting a continuous response variable y.
+
+Consider a single feature (column of X) in our dataset. For some cutoff value
+v, we can split the entire dataset into two parts: data less than v and data
+greater than v. Within each of these haves, we could assign each observation
+a prediction based on the average value of the response within each part. By
+measuring how well this split of the data reduces the RMSE, we can categorize
+how good a particular split is.
+
+A decision tree starts by considering all possible split values for all of the
+features. It then picks the best split and groups the data into two buckets
+based on this most predictive split. Then, it recursively splits each of these
+subgroups further by finding the best second splits from all possible options.
+This continues until some stopping criterion is reached (minimum improvement,
+maximum depth, maximum splits, etc.). The resulting model has the data split
+into N buckets, with each bucket being given the average value of the training
+data in each bucket.
+
+The final form of a decision tree looks something like this:
+
+![](./img/dtree.png)
+
+It is an adaptive form of KNN. We use the response vector y to determine how
+to group the training data into observations that are similar to one another
+based on the best variables and the best cutoff values, rather than using
+Euclidean distance directly.
+
+If you want to see a longer visualization of decision trees, I suggest checking
+out
 [A visual introduction to machine learning](http://www.r2d3.us/visual-intro-to-machine-learning-part-1/).
 It has the benefit of giving great visual intuition for the model as well as
 reviewing some keep machine learning concepts.
@@ -61,14 +114,13 @@ reviewing some keep machine learning concepts.
 ### Gradient Boosted Trees
 
 An individual decision tree is often not a particularly powerful model for
-complex prediction tasks. However, the idea of a tree-based model is to learn
-an adaptive version of KNN. A clever way to increase the predictive power of
+complex prediction tasks. A clever way to increase the predictive power of
 a decision tree is to build a large collection of trees; prediction is then
 done by predicting on each individual tree and averaging (or taking the
 majority class) across the whole set. One such model is called a
 *random forest*. The one that we will look at here is a *gradient boosted tree*,
 or *gradient boosted machine* (GBM). For a continuous response, the algorithm
-works something like this:
+works like this:
 
 - select a random subset of the training data
 - build a decision tree with the selected training data to predict the response
@@ -149,10 +201,11 @@ large number of trees with `print_every_n`.
 ```{r}
 model <- xgb.train(data = data_train,
                    max_depth = 3,
-                   eta = 0.03,
+                   eta = 0.04,
                    nthread = 2,
-                   nrounds = 1000,
+                   nrounds = 1500,
                    objective = "multi:softmax",
+                   eval_metric = "mlogloss",
                    watchlist = watchlist,
                    verbose = TRUE,
                    print_every_n = 25,
@@ -170,8 +223,9 @@ amazon %>%
   summarize(class_rate = mean(user_id == author_pred))
 ```
 
-It manages about 88%, significantly better than before with the KNN model we
-built in the previous section. Another useful benefit of the gradient boosted
+It manages about 89%, significantly better than before with the KNN model we
+built in the previous section and slightly better even than the penalized
+regression model. Another useful benefit of the gradient boosted
 trees over KNN is that the former also provides variable importance scores:
 
 ```{r}
