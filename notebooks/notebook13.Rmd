@@ -1,5 +1,5 @@
 ---
-title: "Notebook 13: Documents as Vectors"
+title: "Notebook 13: Unsupervised Learning"
 output:
   html_document:
     theme: cosmo
@@ -7,62 +7,125 @@ output:
     css: "note-style.css"
 ---
 
-```{r message=FALSE}
+```{r message=FALSE, include=FALSE}
 library(tidyverse)
 library(forcats)
 library(ggrepel)
 library(smodels)
 library(cleanNLP)
 library(Matrix)
+library(magrittr)
 
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
 
-## Food Data
+# Unsupervised learning
 
-Today we make a shift towards a different type of textual analysis. So far we
+Today we make a shift towards a different type of analysis. So far we
 have been mostly interested in a large collection of texts with the goal of
 associating features in predicting some response variable. Now, we start to
 consider the case where we are interested in understanding specific documents
-in a corpus. Typically this will involve a smaller collection of longer
-documents. To illustrate this, we will look at a data set of Wikipedia pages
-corresponding to 61 food items (the same as in the example data from 289, if you
-were in that class). We will load the corpus and the associated tokens. This
-time, we will not worry about splitting the data into training and validation
-sets.
+in a corpus. We will serve two purposes today by introducing some new methods
+while also introducing the form of the third project.
+
+## Yelp Dataset
+
+The third project works with a collection of reviews from the website Yelp. It
+is similar to the Amazon produce reviews, but contains significantly more
+metadata and more authors. I have also a bit cleaner than the Amazon data.
+Each group has been given a different city of data. In the notes I will look
+at data from Toronto.
+
+Let's load the dataset into R and look at the full data table:
 
 ```{r, message=FALSE}
-food <- read_csv("data/food_page.csv")
-token <- read_csv("data/food_page_token.csv.gz")
+yelp <- read_csv("data/toronto.csv.gz")
+token <- read_csv("data/toronto_token.csv.gz")
 
-food
+yelp
 ```
 
-Notice that the document ids are a bit more informative that usual, and indicate
-the name of the Wikipedia page in question.
+You will see that, in addition to the user name and user id (note, these are
+uniquely defined; you can use either one), there is also other information.
+For example, we have a predicted gender for the reviewer, the number of stars
+the review was given, the business name, the business category, and the latitude
+and longitude of the business. Note that the variable `b_name` collapses less
+common businesses into an "Other" category.
+
+The tokens data set contains the same columns as in our other datasets; I have
+also put several important variables directly in the tokens table to make them
+easy to work with.
+
+```{r}
+token
+```
+
+You may already have some ideas about what we might do with this dataset.
+Perhaps predicting the number of stars in the review? Or the user name? We could
+even predict the gender of the reviewer or business category. And yes, in fact
+you are welcome to do all of these things. But today I want to show another
+entirely different set of techniques. Rather than treating these covariates as
+*supervising* variables that we need to predict, we will collapse all of the
+reviews with a common indentifier and use techniques to understand the structure
+of each of these meta-documents. In the notes, I will work with the business
+categories. For the project, you will also look at the other variables.
+
+## An Illustration
+
+To illustrate the techniques that we are going to see, let's do a quick
+illustration. We will call the function `cnlp_utils_tfidf()` using the variable
+`biz_category` in place of `doc_id` to create a matrix with just one row per
+each business category:
+
+```{r}
+X <- token %>%
+  cnlp_utils_tf(
+    doc_set = unique(yelp$biz_category),
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "biz_category",
+    token_var = "token"
+  )
+
+dim(X)
+```
+
+
+Now, let's plot two of the columns, the two corresponding to the terms 'Asian'
+and 'beer':
+
+```{r}
+# NOTE: This is just for illustration; probably do not want to use it
+tibble(
+  biz_category = rownames(X),
+  asian = as.numeric(X[,"Asian"]),
+  beer = as.numeric(X[,"beer"])
+) %>%
+  filter(biz_category != "Other") %>%
+  ggplot(aes(asian, beer)) +
+    geom_point(color = "grey85") +
+    geom_text_repel(aes(label = biz_category), max.overlaps = 40) +
+    scale_x_continuous(limits = c(-1, NA)) +
+    scale_y_continuous(limits = c(-1, NA))
+```
+
+Notice how, even with just these two terms, we can begin to see the
+relationships between each of the business types. Do you see some patterns here
+that follow your intuition about these businesses?
+
+Of course, we will eventually want to understand the data using all of the
+columns of X. That's where we need to learn a few new techniques.
 
 ## TF-IDF
 
-We have already made extensive use of the term frequency matrix in our
-predictive models. Here, we are going to consider a variation of this data
-structure that includes some scaling of the values that can be useful for
-exploring a corpus in a different way. It will be useful to have a way to
-work with the term frequencies in a data frame, with one value in each
-row, as follows:
-
-```{r}
-token %>%
-  sm_text_tfidf(token_var = "lemma", min_df = 0, max_df = 1)
-```
-
-Note that regardless of what variable is used as `token_var`, the column
-containing the thing being counted will be called `token`. The count variable is
-stored in a column called `tf`, which stands for "term frequency". There is
-another term called `tfidf` (TF-IDF), the term frequency-inverse document
-frequency score. It takes a (scaled version) of the term frequency and divides
-by (a scaled) proportion of documents that use the term. Mathematically, if
+In this course we have done a lot of work using the term frequency (TF) matrix.
+As we move into unsupervised learning, we will see that it is important to
+modify this object to scale the entries to account for the overall frequency
+of terms across the corpus. To do this, we will use a TF-IDF (term
+frequency-inverse document frequency) matrix. Mathematically, if
 `tf` are the number of times a term is used in a document and `df` are the
 proportion of documents that use the term at least once, the TF-IDF score can
 be computed as:
@@ -71,113 +134,64 @@ $$ \text{tfidf} = \frac{(1 + log_2(\text{tf}))}{log_2(\text{df})} $$
 
 The score gives a measurement of how important a term is in describing a
 document in the context of the other documents. Note that this is a popular
-choice for the scaling functions, but they are not universal and other software
-way use different choices.
+choice for the scaling functions, but they are not universal and other choices
+are possible. We can create the TF-IDF matrix by replacing the normal function
+with `cnlp_utils_tfidf`.
 
-We can use TF-IDF to try to measure the most important words in each document.
-Here, we filter out particularly rare terms that occur in less than 10% of the
-documents, and then find the 8 nouns that have the highest value of `tfidf` for
+In addition to its other uses, which we will see below, we can also TF-IDF to
+try to measure the most important words in each document by finding the terms
+that have the highest score. For this one particular case, we will use the
+function `sm_text_tfidf` (it returns a data frame with three columns in a
+'long' format, rather than a matrix). Let's see how it works in this case:
+
+```{r, warning = FALSE}
+token %>%
+  sm_text_tfidf(doc_var = "biz_category", token_var = "lemma") %>%
+  group_by(doc_id) %>%
+  arrange(desc(tfidf)) %>%
+  slice_head(n = 4) %>%
+  summarize(tokens = paste(token, collapse = "; ")) %>%
+  print.data.frame()
+```
+
+And again, how well does this match your intuition?
+
+## Distances
+
+One way to understand the structure of our data in the high-dimensional space
+of the TF-IDF matrix is to compute the distance between documents. We could do
+this with typical Euclidean distances. However, this would by heavily biased
+based on the number of words in each document. A better approach is to look
+at the angle between two documents. Look at the two word example above to get
+some intuition for why.
+
+We can compute angle distances that with the function
+`sm_tidy_angle_distance()`:
+
+```{r}
+token %>%
+  cnlp_utils_tfidf(doc_var = "biz_category", token_var = "lemma") %>%
+  sm_tidy_angle_distance()
+```
+
+After removing self-similarities, let's see what the closest neighbor is to
 each document:
 
 ```{r}
 token %>%
-  filter(upos == "NOUN") %>%
-  sm_text_tfidf(min_df = 0.1) %>%
-  arrange(desc(tfidf)) %>%
-  group_by(doc_id) %>%
-  slice(1:8) %>%
-  summarize(sm_paste(token))
+  cnlp_utils_tfidf(doc_var = "biz_category", token_var = "lemma") %>%
+  sm_tidy_angle_distance() %>%
+  filter(document1 < document2) %>%
+  group_by(document1) %>%
+  arrange(distance) %>%
+  slice_head(n = 1) %>%
+  ungroup() %>%
+  arrange(distance)
 ```
 
-Do these capture words that best describe each page? How would you expect the
-top terms to change if we applied it to a larger collection of Wikipedia pages
-that included many non-food related articles?
+Do you see some relationships that suggest this approach is reasonable?
 
-## Documents as Vectors: Illustration
-
-This section illustrates a concept that will be very useful in the final two
-sections. Note, however, that there is generally no need to
-include this in your own analysis of textual data.
-
-The TF-IDF data set is an example of a long-format data set. Conceptually, we
-can think about the idea of converting this into a wide-format. Here, each row
-would correspond to a document; variables would exist for each unique token,
-giving counts corresponding to each document. This object can get quite large,
-but writing the code is relatively straightforward using the techniques. Here,
-we will filter to include only two lemmas, "animal" and "food", and pivot the
-TF-IDF data set into a wide format.
-
-```{r}
-token %>%
-  sm_text_tfidf() %>%
-  filter(token %in% c("animal", "food")) %>%
-  select(doc_id, token, tf) %>%
-  pivot_wider(
-    names_from = "token",
-    values_from = "tf",
-    names_prefix = "lemma_",
-    values_fill = list("tf" = 0)
-  )
-```
-
-Using just these two columns, we can plot a set of pages with `lemma_food` on
-the x-axis and `lemma_animal`. It will be useful to think of these are vectors
-starting at the origin, rather than points floating in space.
-
-```{r}
-token %>%
-  sm_text_tfidf() %>%
-  filter(token %in% c("animal", "food")) %>%
-  select(doc_id, token, tf) %>%
-  pivot_wider(
-    names_from = "token",
-    values_from = "tf",
-    names_prefix = "lemma_",
-    values_fill = list("tf" = 0)
-  )  %>% filter(
-    doc_id %in% c("Apple", "Beef", "Chicken", "Potato", "Milk", "Lamb", "Cheese")
-  ) %>%
-  ggplot() +
-    geom_text(
-      aes(x = lemma_food, y = lemma_animal, label = doc_id),
-      nudge_x = 0.8,
-      nudge_y = 0.8
-    ) +
-    geom_segment(
-      aes(x = 0, y = 0, xend = lemma_food, yend = lemma_animal),
-      arrow = arrow(length = unit(0.3,"cm"))
-    )
-```
-
-What you should notice from this diagram is that these two words do a good job
-of distinguishing the various pages. Beef and Lamb refer to animal food
-products, and therefore have the highest usage of the lemma "animal". Potato
-and Apple are not related to animals are all, and only use the lemma "food".
-Milk and Cheese are food derived from animal products and sit in the middle of
-the plot. Chicken is an animal, but its page focuses heavily on its culinary
-usage, and therefore it sits closer to the dairy products.
-
-The take-away from this illustration is that a wider-format of the term
-frequency values provides an interesting way of grouping and exploring the
-relationships between documents. Generally, we do not want to actually use
-the `pivot_wider` function because it is too slow and clunky to work with a
-data set that may have thousands of columns. Instead, we will use a different
-approach with allows us to think of documents as living in a high dimensional
-space without having to work with these large dimensional spaces directly.
-
-## Dimension Reduction
-
-Consider extending the illustration in the previous section to include a larger
-set of lemmas. While we do not have an easy way of plotting the concept, we can
-try to imagine each document as a an arrow from the origin to a point in a very
-high dimensional space (one dimension for each unique token in the term
-frequency dataset). In this section we will see a way of trying to work with
-this high-dimensional space.
-
-It was mentioned above that the `pivot_wider` function is not a good choice for
-making a wider version of a term frequency data set. A better choice is the
-function `cnlp_utils_tf`, provided by **cleanNLP**, which we have used
-extensively so far in this course.
+## Principal component analysis (PCA)
 
 Principal component analysis is a common method for taking a high-dimensional
 data set and converting it into a smaller set of dimensions that capture many
@@ -185,26 +199,49 @@ of the most interesting aspects of the higher dimensional space. The first
 principal components is defined as a direction in the high-dimensional space
 that captures the most variation in the inputs. The second component is a
 dimension perpendicular to the first that captures the highest amount of
-residual variance. Additional components are defined similarly. We can
-compute principal components from the "dgCMatrix" using the helper function
-`sm_tidy_pca`:
+residual variance. Additional components are defined similarly.
 
-```{r}
-token %>%
-  cnlp_utils_tfidf(token_var = "lemma") %>%
-  sm_tidy_pca(n = 2)
-```
+If you prefer a mathematical definition, define the following vector (called
+the loading vector) of the data matrix X:
 
-The specific mathematics behind the principal components is less important than
-how we interpret the output. Generally, went we plot the first 2 or 3 components
-together, we do not worry about the specific dimensions. Rather, we want to use
-the principal components to show relationships between documents based on
-clusters and other information. Here is a plot of our data set on the
-first two principal components:
+$$ W_1 = \text{argmax}_{\; v : || v ||_2 = 1} \left\{ v^t X^t X v \right\} $$
+
+Then, the first principal component is given by:
+
+$$ Z_1 = X \cdot W_1 $$
+The second loading vector (W2) is defined just as W1, but with the argmax taken
+over all unit vectors perpendicular to W1. And so on.
+
+We can compute principal components using the helper function `sm_tidy_pca`.
+We will grab the first 4 components here:
 
 ```{r, warning = FALSE}
 token %>%
-  cnlp_utils_tfidf(token_var = "lemma") %>%
+  cnlp_utils_tfidf(
+    doc_set = unique(yelp$biz_category),
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "biz_category",
+    token_var = "token"
+  ) %>%
+  sm_tidy_pca(n = 4)
+```
+
+What can we do with these components? Well, for one thing, we can plot the
+first two components to show the relationship between our documents within
+the high dimensional space:
+
+```{r, warning = FALSE}
+token %>%
+  cnlp_utils_tf(
+    doc_set = unique(yelp$biz_category),
+    min_df = 0.001,
+    max_df = 1.0,
+    max_features = 10000,
+    doc_var = "biz_category",
+    token_var = "token"
+  ) %>%
   sm_tidy_pca() %>%
   ggplot(aes(x = v1, y = v2)) +
     geom_point(color = "grey90") +
@@ -215,21 +252,20 @@ token %>%
     theme_void()
 ```
 
-Notice that the seafood and fruits cluster along different parts of the plot.
-The other food groups roughly cluster in the upper-left hand side of the plot,
-with vegetables closer to the fruits. The Duck page, an aquatic bird, is sit
-in-between the seafood and other meats. All of these capture general
-relationships we might expect given our knowledge of the pages and what they
-represent.
+I will keep asking this: does the relationship amongst the points make sense
+and does it tell us anything interesting?
 
-Another method for reducing the dimension of our dataset is called UMAP
-(Uniform Manifold Approximation and Projection). It has a much more complex
-algorithm that is able to better spread the dataset uniformly over the plot
-region. We can run this algorithm using the function `sm_tidy_umap`:
+## UMAP
 
-```{r, warning=FALSE}
-token %>%
-  cnlp_utils_tfidf(token_var = "lemma") %>%
+A similar, slightly more complex, method for doing dimensionality reduction
+is called Uniform Manifold Approximation and Projection (UMAP). I will
+refer you to the [original paper](https://arxiv.org/abs/1802.03426) for a
+formal description; in short, it tries to preserve the distances between points
+while spreading them out in a lower dimension. We can compute the projection
+using `sm_tidy_umap()`
+
+```{r, warning = FALSE}
+X %>%
   sm_tidy_umap() %>%
   ggplot(aes(x = v1, y = v2)) +
     geom_point(color = "grey90") +
@@ -246,64 +282,65 @@ are less clumped together here, but also that the structures from the principal
 component analysis are not as clearly defined. The benefits of UMAP become more
 apparent with larger datasets.
 
-## Document Distance
+## Clusters with K-means
 
-In the previous two sections we treated documents as being points in a
-high-dimensional space, and commented that our primary objective is
-understanding the relationships between the documents in this space. We can
-approach this question more directly by computing the distances between
-documents in the high-dimensional space. This can be done by using the
-`sm_tidy_distance` function applied to the TF-IDF matrix:
+One thing that we often do when looking at plots of dimensionality reduction
+is to look for clumps of documents that co-occur. We can do this explicit
+by clustering the data using a clustering algorithm. Here, we will use a popular
+option called K-means (note, this is not the same as k-NN, but I suppose it is
+not entirely unrelated). It is an iterative algorithm that works as follows:
 
-```{r}
-token %>%
-  cnlp_utils_tfidf(token_var = "lemma") %>%
-  sm_tidy_distance()
-```
+1. Pick the number of clusters N that you want to detect.
+2. Randomly choose N data points as the starting centers of each cluster.
+3. Compute the distance of every data point to the centers of the current
+clusters.
+4. Assign each data point to the cluster whose center it is closest.
+5. Re-compute the cluster centers as the average value of all the points in a
+cluster.
+6. Take the new cluster centers, and repeat the process (computer distances,
+reassign to groups, and recompute the centers) iteratively until convergence.
 
-The output gives the distance between every pair of documents. Self-pairs (the
-distance between Apple and Apple) are included to assist with other kinds of
-analysis. Using this output, we can join each page to its closest neighbor:
+The algorithm is not entirely deterministic because of the random starting
+points. Typically, the algorithm is run several times and the "best" clustering
+is chosen. How do we define the "best" in the case of a clustering algorithm?
+A typical method is to measure the sum of squared distances to the cluster
+centers, a quantity that a good clustering will minimize.
 
-```{r}
-token %>%
-  cnlp_utils_tfidf(token_var = "lemma") %>%
-  sm_tidy_distance() %>%
-  filter(document1 != document2) %>%
-  group_by(document1) %>%
-  arrange(distance) %>%
-  slice_head(n = 1) %>%
-  ungroup() %>%
-  arrange(distance)
-```
-
-Unfortunately, these links are largely not very intuitive Penne and
-Flounder, for example, do not have very much in common. The issue here is that
-the length of each document has a strong influence on the distance between
-points. Returning to our illustrative example with just two lemmas, notice
-that Potato is actually closer to Milk than it is to Apple. As an alternative,
-we can compute the *angle* between two vectors using the function
-`sm_tidy_angle_distance`.
+We can implement the K-means algorithm using the function `sm_kmeans`. Here we
+will run it in just the first two principal components and 5 clusters:
 
 ```{r}
 token %>%
-  cnlp_utils_tfidf(token_var = "lemma") %>%
-  sm_tidy_angle_distance() %>%
-  filter(document1 < document2) %>%
-  group_by(document1) %>%
-  arrange(distance) %>%
-  slice_head(n = 1) %>%
-  ungroup() %>%
-  arrange(distance)
+  cnlp_utils_tfidf(doc_var = "biz_category", token_var = "lemma") %>%
+  sm_tidy_pca(n = 2) %>%
+  sm_kmeans(clusters = 5) %>%
+  ggplot(aes(v1, v2)) +
+    geom_point(aes(color = factor(cluster))) +
+    scale_color_viridis_d()
 ```
 
-These relationships seem much more as expected, linking for example Milk and
-Yogurt, Potato and Sweet Potato, Broccoli and Cauliflower. We will do more with
-these distances as a form of network analysis in a subsequent notebook.
+Often you will find that including a few dozen PCA components provides
+a better fit (though it is rarely useful to use the entire TF-IDF). We can
+plot this clustering as well, but note that the clusters are harder to see
+because they are formed in 10-dimensions but plotted in 2. For these, then,
+it is usually easier to look at the clusters as text:
+
+```{r}
+token %>%
+  cnlp_utils_tfidf(doc_var = "biz_category", token_var = "lemma") %>%
+  sm_tidy_pca(n = 10) %>%
+  sm_kmeans(clusters = 10) %>%
+  group_by(cluster) %>%
+  summarize(sm_paste(document)) %>%
+  use_series(document_paste)
+```
+
+And once again, you should see some unsurprising (by perhaps still interesting?)
+clusters here.
 
 ## Word Relationships
 
-In all of the preceding analyses, we have focused on the analysis of the
+In the preceding analyses, we have focused on the analysis of the
 document their usage of words. There are often multiple ways of widening a
 data set, each leading to different kinds of analysis. The term frequency
 data set is no different. We could widen the data set by treating each row as a
