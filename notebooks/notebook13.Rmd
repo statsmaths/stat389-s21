@@ -21,14 +21,12 @@ options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
 
-# Unsupervised learning
-
 Today we make a shift towards a different type of analysis. So far we
 have been mostly interested in a large collection of texts with the goal of
 associating features in predicting some response variable. Now, we start to
 consider the case where we are interested in understanding specific documents
 in a corpus. We will serve two purposes today by introducing some new methods
-while also introducing the form of the third project.
+while also introducing the data format for the third project.
 
 ## Yelp Dataset
 
@@ -64,8 +62,10 @@ token
 
 You may already have some ideas about what we might do with this dataset.
 Perhaps predicting the number of stars in the review? Or the user name? We could
-even predict the gender of the reviewer or business category. And yes, in fact
-you are welcome to do all of these things. But today I want to show another
+even predict the gender of the reviewer or the category of the business.
+And yes,  you are welcome to do all of these things.
+
+Today, however, I want to also show another
 entirely different set of techniques. Rather than treating these covariates as
 *supervising* variables that we need to predict, we will collapse all of the
 reviews with a common indentifier and use techniques to understand the structure
@@ -149,7 +149,7 @@ token %>%
   sm_text_tfidf(doc_var = "biz_category", token_var = "lemma") %>%
   group_by(doc_id) %>%
   arrange(desc(tfidf)) %>%
-  slice_head(n = 4) %>%
+  slice_head(n = 5) %>%
   summarize(tokens = paste(token, collapse = "; ")) %>%
   print.data.frame()
 ```
@@ -204,7 +204,7 @@ residual variance. Additional components are defined similarly.
 If you prefer a mathematical definition, define the following vector (called
 the loading vector) of the data matrix X:
 
-$$ W_1 = \text{argmax}_{\; v : || v ||_2 = 1} \left\{ v^t X^t X v \right\} $$
+$$ W_1 = \text{argmax}_{\; v : || v ||_2 = 1} \left\{ || X v ||_2 \right\} $$
 
 Then, the first principal component is given by:
 
@@ -329,7 +329,7 @@ it is usually easier to look at the clusters as text:
 token %>%
   cnlp_utils_tfidf(doc_var = "biz_category", token_var = "lemma") %>%
   sm_tidy_pca(n = 10) %>%
-  sm_kmeans(clusters = 10) %>%
+  sm_kmeans(clusters = 12) %>%
   group_by(cluster) %>%
   summarize(sm_paste(document)) %>%
   use_series(document_paste)
@@ -388,6 +388,25 @@ token %>%
   slice_head(n = 1) %>%
   ungroup() %>%
   arrange(distance)
+```
+
+Or even clustering:
+
+```{r, message=FALSE}
+set.seed(1)
+
+token %>%
+  filter(upos == "NOUN") %>%
+  cnlp_utils_tfidf(
+    min_df = 0, max_df = 1, max_features = 400
+  ) %>%
+  t() %>%
+  sm_tidy_pca(item_name = "word", n = 10) %>%
+  sm_kmeans(clusters = 45, item_name = "word") %>%
+  group_by(cluster) %>%
+  summarize(words = paste(word, collapse = "; "), n = n()) %>%
+  arrange(n) %>%
+  use_series(words)
 ```
 
 Do these relationships seem reasonable to you? Do they tell you anything about

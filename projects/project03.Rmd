@@ -17,7 +17,7 @@ options(pillar.min_character_chars = 15)
 Sys.setlocale("LC_TIME", "en_US.UTF-8")
 ```
 
-**Due Date**: 08 April 2021
+**Due Date**: 06 April 2021
 
 ## General Instructions
 
@@ -47,36 +47,35 @@ the next project.
 The data for this project is similar to the previous one, but this time reviews
 come from Yelp. I created the data set based on what is provided by the
 [Yelp Open Dataset](https://www.yelp.com/dataset/) project. As with before, I
-have selected reviewers with a large number of reviews. The prediction task is
-once again to predict who authored a review based on the text of the review.
-Each group has been assigned reviews from a different city.
+have selected reviewers with a large number of reviews. However, this time
+you have a number of different variables to work with. Variables that
+are available to focus on (either as a prediction or as an unsupervised
+grouping variable) are:
 
-As starting prompts, you can begin with the same questions posed in the previous
-notebook. However, I would also like you to consider the new methods we have
-learned for describing individual documents as vector. For this, do not consider
-the individual reviews (there are too many!); instead treat all of the text
-for a single author into a single "document". With this data set, here are
-some things to investigate:
+1. author gender (binary categories; automatically guessed using first names;
+yes there are a lot of problems with this, but still interesting to look at)
+2. author name (100 authors in each dataset)
+3. stars (1-5)
+4. business categories (as in the notes)
+5. business names
 
-- What are some words that characterize each author?
-- Describe the similarity between the authors based on word usage. Are there
-pairs or groups that are very similar? Author(s) that are very different than
-the others?
-- Describe the sililarity between the authors based on POS n-grams.
-- Pick an other or groups of authors and describe them relative to the rest of
-the collection. Do the review certain types of places? Are they in specific
-parts of the city?
+As with the first two projects, you are encouraged to take the data in whatever
+direction you find most interesting. The only thing I require is that you focus
+a non-trivial amount of your work on integrating the unsupervised approaches
+covered in Notebook13 into your analysis. Note that gender has too few
+categories to used unsupervised on its own and business names likely have too
+many.
 
-As always, the specifics are up to your group and what you find interesting.
-However, you should address something from both the supervised and unsupervised
-learning tasks for your presentation.
+If you need some questions to get started, I am happy to provide some of these.
+However, there are so many directions to go in, I only want to do this if you
+are struggling with an idea.
 
 ## Groups
 
 Each group is working with a different city's data. You should be able to
 download your data set from within the `project03.Rmd` file.
 
-**Group 1**: `toronto`
+**Group 1**: `charlotte`
 
 **Group 2**: `calgary`
 
@@ -90,7 +89,7 @@ download your data set from within the `project03.Rmd` file.
 
 **Group 7**: `cleveland`
 
-**Group 8**: `charlotte`
+**Group 8**: `toronto`
 
 ## Notes
 
