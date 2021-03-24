@@ -69,14 +69,24 @@ Today, however, I want to also show another
 entirely different set of techniques. Rather than treating these covariates as
 *supervising* variables that we need to predict, we will collapse all of the
 reviews with a common indentifier and use techniques to understand the structure
-of each of these meta-documents. In the notes, I will work with the business
-categories. For the project, you will also look at the other variables.
+of each of these meta-documents. So, to summarize, for us:
+
+- **supervised learner**: Small set of categories with many examples of each.
+We want to find trends to predict the category based on common properties of
+the examples.
+- **unsupervised learning**: We are interested in each document individually,
+to understand how it relates to all of the other documents. We will usually
+construct these by collapsing documents across a supervised variable (i.e.,
+combine all of the reviews from a single person into one).
+
+In the notes, I will work with the business categories. For the project, you
+will also look at the other variables.
 
 ## An Illustration
 
 To illustrate the techniques that we are going to see, let's do a quick
 illustration. We will call the function `cnlp_utils_tfidf()` using the variable
-`biz_category` in place of `doc_id` to create a matrix with just one row per
+`biz_category` in place of `doc_id` to create a matrix with just one row for
 each business category:
 
 ```{r}
@@ -92,7 +102,6 @@ X <- token %>%
 
 dim(X)
 ```
-
 
 Now, let's plot two of the columns, the two corresponding to the terms 'Asian'
 and 'beer':

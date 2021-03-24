@@ -83,9 +83,9 @@ download your data set from within the `project03.Rmd` file.
 
 **Group 4**: `phoenix`
 
-**Group 5**: `madison`
+**Group 5**: `las-vegas`
 
-**Group 6**: `las-vegas`
+**Group 6**: `madison`
 
 **Group 7**: `cleveland`
 
