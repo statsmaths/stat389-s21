@@ -135,11 +135,11 @@ As we move into unsupervised learning, we will see that it is important to
 modify this object to scale the entries to account for the overall frequency
 of terms across the corpus. To do this, we will use a TF-IDF (term
 frequency-inverse document frequency) matrix. Mathematically, if
-`tf` are the number of times a term is used in a document and `df` are the
-proportion of documents that use the term at least once, the TF-IDF score can
-be computed as:
+`tf` are the number of times a term is used in a document, `df` are the
+number of documents that use the term at least once, and `N` are the total
+number of document, the TF-IDF score can be computed as:
 
-$$ \text{tfidf} = \frac{(1 + log_2(\text{tf}))}{log_2(\text{df})} $$
+$$ \text{tfidf} = (1 + log_2(\text{tf})) \times log_2(\text{N} / \text{df}) $$
 
 The score gives a measurement of how important a term is in describing a
 document in the context of the other documents. Note that this is a popular

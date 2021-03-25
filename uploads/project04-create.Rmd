@@ -28,9 +28,9 @@ Here, grab all of the links from one (or more) starter pages and see how many
 pages there are. Try to aim for somewhere between 100 and 1500 pages.
 
 ```{r, message=FALSE}
-starter_page <- c()
+starter_page_name <- c("")
 
-pages <- wiki_get_pages(starter_page, lang = "en")
+starter_page <- wiki_get_pages(starter_page_name, lang = "en")
 exp_pages <- wiki_expand_pages(pages)
 wiki <- wiki_get_pages_text(exp_pages)
 
