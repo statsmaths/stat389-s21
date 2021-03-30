@@ -63,8 +63,8 @@ As with the first two projects, you are encouraged to take the data in whatever
 direction you find most interesting. The only thing I require is that you focus
 a non-trivial amount of your work on integrating the unsupervised approaches
 covered in Notebook13 into your analysis. Note that gender has too few
-categories to used unsupervised on its own and business names likely have too
-many.
+categories to use unsupervised on its own and business names likely have too
+many to do supervised learning.
 
 If you need some questions to get started, I am happy to provide some of these.
 However, there are so many directions to go in, I only want to do this if you
