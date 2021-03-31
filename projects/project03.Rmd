@@ -17,7 +17,7 @@ options(pillar.min_character_chars = 15)
 Sys.setlocale("LC_TIME", "en_US.UTF-8")
 ```
 
-**Due Date**: 06 April 2021
+**Due Date**: ~~06 April 2021~~ 08 April 2021
 
 ## General Instructions
 
