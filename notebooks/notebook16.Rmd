@@ -1,5 +1,5 @@
 ---
-title: "Notebook 16: Named Entity Recognition"
+title: "Notebook 16: Latent Dirchlet Allocation (LDA)"
 output:
   html_document:
     theme: cosmo
@@ -13,6 +13,7 @@ library(forcats)
 library(ggrepel)
 library(smodels)
 library(cleanNLP)
+library(topicmodels)
 library(magrittr)
 
 theme_set(theme_minimal())
@@ -20,103 +21,241 @@ options(dplyr.summarise.inform = FALSE)
 options(width = 77L)
 ```
 
-## Wikipedia NER
+## Creating a Corpus of Wikipedia Documents
 
-For our final set of notes, we will once again look at the Wikipedia data set
-created by following the links from the Coffee and Tea pages.
+For Project 4, unlike the other projects, you will be constructing your own
+corpus of documents to work with. These documents will come from the text of
+Wikipedia articles. The functions needed to do this can be loaded by reading
+in the `wiki.R` script:
 
-```{r, message = FALSE}
-wiki <- read_csv(file.path("data", "wiki_coffee_tea.csv"))
+```{r}
+source("wiki.R")
 ```
 
-We have been using the results from parsing text throughout the semester. We
-have used the tokens table produced by the `cnlp_annotate` function, but when
-using the spaCy backend, there is another table of annotations that can
-sometimes by very useful called `entity`. For reference, this is how to extract
-it from the output:
+The function `wiki_get_pages` takes a vector of page names, queries the
+MediaWiki API, and returns a data frame with the HTML parsed version of
+the page, as well as information about all internal links included in the
+page. Here, we will use it to grab the pages "Coffee" and "Tea". Note that
+the function requires that you set the language of Wikipedia that you are
+interested in grabbing data from.
 
-```{r, eval=FALSE}
+```{r}
+pages <- wiki_get_pages(c("Coffee", "Tea"), lang = "en")
+pages
+```
+
+The functions are smart and create a local cache of files that avoids having
+to query the API over and over again.
+
+Now, we will use the function `wiki_expand_pages` to grab all of the pages
+that are linked to from the pages in the data frame `pages`. That is, returning
+data for all pages that are linked to from the Coffee or Tea pages. Be careful
+with this data set! RStudio has trouble displaying the raw text in the resulting
+data frame and will likely crash if you try to print out all of the columns or
+open the data in the view finder. It's better to just print out the page and
+lang variables
+
+```{r}
+exp_pages <- wiki_expand_pages(pages)
+select(exp_pages, page, lang)
+```
+
+We now have a corpus of 1131 pages. Finally, we will use the function
+`wiki_get_pages_text` to extract the raw text from the Wikipedia files.
+This requires parsing all of the HTML records and can take a minute or
+two to finish running, but note that it does not grab any additional data
+from the MediaWiki API. As with the previous data set, do not try to print
+out all of the columns of the data in R.
+
+```{r}
+wiki <- wiki_get_pages_text(exp_pages)
+select(wiki, page, sec_num, section)
+```
+
+Notice that the corpus now contains over 41 thousand documents because it
+extracts each paragraph as an individual document. It also includes the
+section number and title associated with each page. These can be useful for
+many analyses, but we will not make use of them right now. We can instead
+roll-up the pages so that each row of the data set contains only one page.
+
+```{r}
+wiki <- tapply(wiki$text, wiki$page, paste, collapse = " ")
+wiki <- tibble(doc_id = names(wiki), text = as.character(wiki))
+dim(wiki)
+```
+
+Finally, we need to run the NLP annotation engine over this data set. Here is
+the code to run and save the results using the **udpipe** backend:
+
+```{r, eval=FALSE, message=FALSE, warning=FALSE}
+cnlp_init_udpipe("english")
+anno <- cnlp_annotate(wiki)$token
+
+write_csv(wiki, file.path("data", "wiki_coffee_tea.csv"))
+write_csv(token, file.path("data", "wiki_coffee_tea_token.csv.gz"))
+```
+
+The saved results can then be read-in and used without having to re-create the
+data set. We will use this data in several of our upcoming notebooks.
+
+```{r, eval=FALSE, echo=FALSE}
+library(reticulate)
+use_virtualenv("/Users/admin/gh/stat389-s21/env", required = TRUE)
 cnlp_init_spacy("en_core_web_sm")
 anno <- cnlp_annotate(wiki)
+
 token <- anno$token
-ner <- anno$entity
+entity <- anno$entity
+
+write_csv(wiki, file.path("data", "wiki_coffee_tea.csv"))
+write_csv(token, file.path("data", "wiki_coffee_tea_token.csv.gz"))
+write_csv(entity, file.path("data", "wiki_coffee_tea_entity.csv.gz"))
 ```
 
-```{r, echo=FALSE, message=FALSE}
+## Latent Dirchlet Allocation
+
+We will now proceed to the methodological topic for today. For consistency,
+let's read back in the Wikipedia data and tokens files.
+
+```{r, message=FALSE}
+wiki <- read_csv(file.path("data", "wiki_coffee_tea.csv"))
 token <- read_csv(file.path("data", "wiki_coffee_tea_token.csv.gz"))
-ner <- read_csv(file.path("data", "wiki_coffee_tea_entity.csv.gz"))
 ```
 
-The process of finding *entities* is called Named Entity Recognition (NER). It
-is a very active area of natural language processing. This is what the data
-detected by the named entity recognition process looks like:
+Today we are going to investigate a method for *topic modeling*. This is an
+unsupervised task that seeks to identify topics within a corpus of text. What
+exactly is a topic? Mathematically speaking, it is usually defined as a
+probability distribution over a collection of words. Words that have a high
+probability within a topic tend to classify the topics themes in a colloquial
+sense. For example, a topic that captures the idea of baseball would have high
+probabilities on words such as "base", "player", "strike", "umpire", "team",
+and so forth.
+
+We will be use a model today called Latent Dirchlet Allocation, or more commonly
+LDA. Given a fixed number of topics and fixed set of words (called a *lexicon*),
+LDA assumes that documents consist of a random collection of words
+constructed according to the following model:
+
+1. Each document is randomly partitioned into topics. For example, one document
+may be 20% in Topic A, 70% in Topic B, and 1% in the remaining 10 topics.
+2. Each topic is similarly assigned as a probability distribution of all the
+available words.
+3. When choosing words to create a document, pick a topic at random
+proportional to the topic distribution of the document, and then pick a word
+proportional to the chosen topic.
+4. The number of words in each document is assumed to be fixed, and there is
+assumed to be no relationship between the words in each document.
+
+This model is a great example of the adage that "all models are wrong, but
+some are useful". Clearly, this is not how documents are constructed, and
+words are not independent of one another. However, the approximation is close
+enough to produce a useful abstraction for detecting themes within a corpus of
+textual documents.
+
+You will notice that the description above is in some ways backwards from
+reality. It assumes that we know the distribution of the topics over the words
+and documents but do not know what words are present in the documents. In fact,
+we know the words but not the topics! This is an example of a Bayesian model.
+If we wrote down the assumptions rigorously, we could invert the probabilities
+using Bayes' Theorem. That is, instead of knowing the probability of the
+documents given the topics, we can determine the probability of the topics given
+the documents. It is not possible to do this analytically, however, and a
+simulation method is needed to figure out what distribution of topics over the
+words and documents is most likely to have produced the observed data.
+
+As a final note about the method, the name comes from the standard distribution
+used to determine the topics (the Dirichlet distribution) and the fact that the
+topics themselves are never observed (that is, the are *latent*).
+
+Now, let's actually compute an LDA topic model. The first step in creating a
+topic model is to compute a TF matrix. I tend to use only nouns, adjectives and
+adverbs for this task (verbs are okay too, if you would like).
 
 ```{r}
-ner
+X <- token %>%
+  filter(upos %in% c("NOUN", "ADJ", "ADV")) %>%
+  cnlp_utils_tf(min_df = 0.001, max_df = 0.5, doc_set = wiki$doc_id)
 ```
 
-The algorithm has identified one or more tokens corresponding to known entities,
-such as dates, people, or locations. Here are some of the different entity types
-included in the data:
+Next, we use the `sm_lda_topics` function. It requires passing the TF matrix
+as well as selecting the number of topics. Because this requires a simulation
+method, running the topic model can take a few minutes to complete. The results
+should be consistent from run to run because I have set the random seed inside
+of the implementation. The output contains two components, which we will save
+as individual data frames.
 
 ```{r}
-ner %>%
-  group_by(entity_type) %>%
-  summarize(sm_count()) %>%
-  arrange(desc(count))
+topic_model <- sm_lda_topics(X, num_topics = 16)
+topic_docs <- topic_model$docs
+topic_terms <- topic_model$terms
 ```
 
-More details about the entity types can be found in the
-[spaCy documentation](https://spacy.io/api/annotation#named-entities).
-
-Entity detection has a large number of useful applications; for us we will
-mostly use it to describe documents. This might be very useful for the final
-project, which works with one of two different news corpora. For example, we
-can detect the GPE (countries, cities, states) tags that occur most frequently
-(and at least 20 times) in each document:
+The first data frame provides the probability distributions of the documents.
+It tells us own much weight each document receives from each topic.
 
 ```{r}
-ner %>%
-  filter(entity_type == "GPE") %>%
-  group_by(doc_id, entity) %>%
-  summarize(sm_count()) %>%
-  arrange(doc_id, desc(count)) %>%
-  slice_head(n = 1) %>%
-  filter(count >= 20) %>%
-  mutate(lab = paste(doc_id, entity, sep = " => ")) %>%
-  use_series(lab)
+topic_docs
 ```
 
-Or, similarly, languages that are mentioned at least 4 times
+Looking at the documents with the highest probability for each topic begins to
+show what the LDA algorithm has found in each topic. Can you categorize what
+themes some of these topics capture?
 
 ```{r}
-ner %>%
-  filter(entity_type == "LANGUAGE") %>%
-  group_by(doc_id, entity) %>%
-  summarize(sm_count()) %>%
-  arrange(doc_id, desc(count)) %>%
-  slice_head(n = 1) %>%
-  filter(count >= 4) %>%
-  mutate(lab = paste(doc_id, entity, sep = " => ")) %>%
-  use_series(lab)
+topic_docs %>%
+  arrange(topic, desc(prob)) %>%
+  group_by(topic) %>%
+  slice_head(n = 10) %>%
+  group_by(topic) %>%
+  mutate(doc_id = paste(topic, doc_id, sep = " => ")) %>%
+  use_series(doc_id)
 ```
 
-Dates can be useful too, though some are more useful that others:
+Similarly, the terms data frame gives the probability distribution of the terms.
+These probabilities can be quite small; rather than giving then on a raw scale,
+the function returns the logarithm of the probability in the column named
+`beta` (for this reason, these values are all negative).
 
 ```{r}
-ner %>%
-  filter(entity_type == "DATE") %>%
-  group_by(doc_id, entity) %>%
-  summarize(sm_count()) %>%
-  arrange(doc_id, desc(count)) %>%
-  slice_head(n = 1) %>%
-  filter(count > 10) %>%
-  mutate(lab = paste(doc_id, entity, sep = " => ")) %>%
-  use_series(lab)
+topic_terms
 ```
 
-I do not have much more to say about these other than that they can be useful
-for specific tasks. For example, you can use them to find characters in a novel
-or for automatically linking pages to secondary sources. This later step
-requires an additional step of entity linking, which is not currently supported
-in the production version of **cleanNLP**, but should be soon.
+Looking at words for each topic gives another view for understanding the
+detected topics. In many applications, we do not have useful titles of
+the documents, and using the word distributions is the only automatic way of
+describing each topic.
+
+```{r}
+topic_terms %>%
+  arrange(topic, desc(beta)) %>%
+  group_by(topic) %>%
+  slice_head(n = 10) %>%
+  group_by(topic) %>%
+  summarize(sm_paste(token))
+```
+
+How do these match up with the topics that you identified by the document
+names?
+
+## Visualizing Topics Models
+
+Looking at the output of an LDA model in R can be a bit difficult. Let's see
+a better way to visualize the results. Start by loading the topic.R file, which
+contains one additional function:
+
+```{r}
+source("topic.R")
+```
+
+Now, we will used the function `topics_create_json` to create a JSON file that
+contains the topics generated by the LDA model. We will write it to the local
+disk using `write_json`:
+
+```{r}
+topic_json <- topics_create_json(topic_docs, topic_terms, wiki, truncate = 1000L)
+write_json(topic_json, "wiki-topics.json")
+```
+
+Now, go to the website [Topic Model Visualizer](https://statsmaths.github.io/topic-explo/build/)
+and upload the JSON file that we just produced. It should create an interactive
+visualization for you to explore.

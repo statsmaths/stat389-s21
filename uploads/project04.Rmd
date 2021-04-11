@@ -13,6 +13,7 @@ library(glmnet)
 library(cleanNLP)
 library(magrittr)
 
+source("topic.R")
 theme_set(theme_minimal())
 options(dplyr.summarise.inform = FALSE)
 ```

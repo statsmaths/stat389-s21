@@ -9,6 +9,10 @@ lab08.Rmd
 project01.Rmd
 project02.Rmd
 project03.Rmd
+project04.Rmd
+project04-create.Rmd
+wiki.R
+topic.R
 note-style.css
 data/ca_house_price.csv
 data/diamonds.csv
@@ -22,4 +26,3 @@ data/stylo_us.csv
 data/stylo_us_token.csv.gz
 data/stylo_uk.csv
 data/stylo_uk_token.csv.gz
-
