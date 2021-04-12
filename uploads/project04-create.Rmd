@@ -27,11 +27,11 @@ the project.
 Here, grab all of the links from one (or more) starter pages and see how many
 pages there are. Try to aim for somewhere between 100 and 1500 pages.
 
-```{r, message=FALSE}
+```{r, message=TRUE}
 starter_page_name <- c("")
 
 starter_page <- wiki_get_pages(starter_page_name, lang = "en")
-exp_pages <- wiki_expand_pages(pages)
+exp_pages <- wiki_expand_pages(starter_page)
 wiki <- wiki_get_pages_text(exp_pages)
 
 wiki <- tapply(wiki$text, wiki$page, paste, collapse = " ")
@@ -54,7 +54,7 @@ up Python on your machine (a real pain for just this one assignment).
 
 ```{r}
 cnlp_init_udpipe("english")
-token <- cnlp_annotate(wiki)$token
+token <- cnlp_annotate(wiki, verbose = 1)$token
 ```
 
 And finally, save the data set here:
