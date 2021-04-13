@@ -518,58 +518,55 @@ summary {
 ## 1 Coffee en    &quot;&lt;div class=\&quot;mw-parser-output… Open_access 16th_century 21st…
 ## 2 Tea    en    &quot;&lt;div class=\&quot;mw-parser-output… Agriculture_in_Georgia_(count…</code></pre>
 <p>The functions are smart and create a local cache of files that avoids having to query the API over and over again.</p>
-<p>Now, we will use the function <code>wiki_expand_pages</code> to grab all of the pages that are linked to from the pages in the data frame <code>pages</code>. That is, returning data for all pages that are linked to from the Coffee or Tea pages. Be careful with this data set! RStudio has trouble displaying the raw text in the resulting data frame and will likely crash if you try to print out all of the columns or open the data in the view finder. It’s better to just print out the page and lang variables</p>
+<p>Now, we will use the function <code>wiki_expand_pages</code> to grab all of the pages that are linked to from the pages in the data frame <code>pages</code>. That is, returning data for all pages that are linked to from the Coffee or Tea pages.</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>exp_pages <span class="ot">&lt;-</span> <span class="fu">wiki_expand_pages</span>(pages)</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">select</span>(exp_pages, page, lang)</span></code></pre></div>
-<pre><code>## # A tibble: 1,131 x 2
-##    page              lang 
-##    &lt;chr&gt;             &lt;chr&gt;
-##  1 Coffee            en   
-##  2 Tea               en   
-##  3 16th_century      en   
-##  4 21st_century      en   
-##  5 AARP              en   
-##  6 Abdominal_surgery en   
-##  7 Acacia            en   
-##  8 Acid              en   
-##  9 Adal_Sultanate    en   
-## 10 Aden              en   
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>exp_pages</span></code></pre></div>
+<pre><code>## # A tibble: 1,131 x 4
+##    page       lang  text                         links                       
+##    &lt;chr&gt;      &lt;chr&gt; &lt;chr&gt;                        &lt;chr&gt;                       
+##  1 Coffee     en    &quot;&lt;div class=\&quot;mw-parser-out… Open_access 16th_century 21…
+##  2 Tea        en    &quot;&lt;div class=\&quot;mw-parser-out… Agriculture_in_Georgia_(cou…
+##  3 16th_cent… en    &quot;&lt;div class=\&quot;mw-parser-out… Timeline_of_the_17th_centur…
+##  4 21st_cent… en    &quot;&lt;div class=\&quot;mw-parser-out… Timeline_of_the_20th_centur…
+##  5 AARP       en    &quot;&lt;div class=\&quot;mw-parser-out… 501(c)(4) 501(c)_organizati…
+##  6 Abdominal… en    &quot;&lt;div class=\&quot;mw-parser-out… ASA_physical_status_classif…
+##  7 Acacia     en    &quot;&lt;div class=\&quot;mw-parser-out… A._P._de_Candolle Abkhazia …
+##  8 Acid       en    &quot;&lt;div class=\&quot;mw-parser-out… Acidity Acidic Acetate Acet…
+##  9 Adal_Sult… en    &quot;&lt;div class=\&quot;mw-parser-out… Djibouti Index_of_Djibouti-…
+## 10 Aden       en    &quot;&lt;div class=\&quot;mw-parser-out… South_Yemen Yemen &#39;Amran 19…
 ## # … with 1,121 more rows</code></pre>
-<p>We now have a corpus of 1131 pages. Finally, we will use the function <code>wiki_get_pages_text</code> to extract the raw text from the Wikipedia files. This requires parsing all of the HTML records and can take a minute or two to finish running, but note that it does not grab any additional data from the MediaWiki API. As with the previous data set, do not try to print out all of the columns of the data in R.</p>
+<p>We now have a corpus of 1131 pages. We will use the function <code>wiki_get_pages_text</code> to extract the raw text from the Wikipedia files. This requires parsing all of the HTML records and can take a minute or two to finish running, but note that it does not grab any additional data from the MediaWiki API. The function itself returns each paragraph as an individual row; we use the function <code>tapply</code> to combine these into a single document.</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">wiki_get_pages_text</span>(exp_pages)</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">select</span>(wiki, page, sec_num, section)</span></code></pre></div>
-<pre><code>## # A tibble: 41,326 x 3
-##    page   sec_num section     
-##    &lt;chr&gt;    &lt;dbl&gt; &lt;chr&gt;       
-##  1 Coffee       0 0. Lead     
-##  2 Coffee       0 0. Lead     
-##  3 Coffee       0 0. Lead     
-##  4 Coffee       0 0. Lead     
-##  5 Coffee       0 0. Lead     
-##  6 Coffee       1 1. Etymology
-##  7 Coffee       1 1. Etymology
-##  8 Coffee       2 2. History  
-##  9 Coffee       2 2. History  
-## 10 Coffee       2 2. History  
-## # … with 41,316 more rows</code></pre>
-<p>Notice that the corpus now contains over 41 thousand documents because it extracts each paragraph as an individual document. It also includes the section number and title associated with each page. These can be useful for many analyses, but we will not make use of them right now. We can instead roll-up the pages so that each row of the data set contains only one page.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">tapply</span>(wiki<span class="sc">$</span>text, wiki<span class="sc">$</span>page, paste, <span class="at">collapse =</span> <span class="st">&quot; &quot;</span>)</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">tibble</span>(<span class="at">doc_id =</span> <span class="fu">names</span>(wiki), <span class="at">text =</span> <span class="fu">as.character</span>(wiki))</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="fu">dim</span>(wiki)</span></code></pre></div>
-<pre><code>## [1] 1131    2</code></pre>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">tapply</span>(wiki<span class="sc">$</span>text, wiki<span class="sc">$</span>page, paste, <span class="at">collapse =</span> <span class="st">&quot; &quot;</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">tibble</span>(<span class="at">doc_id =</span> <span class="fu">names</span>(wiki), <span class="at">text =</span> <span class="fu">as.character</span>(wiki))</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>wiki</span></code></pre></div>
+<pre><code>## # A tibble: 1,131 x 2
+##    doc_id           text                                                     
+##    &lt;chr&gt;            &lt;chr&gt;                                                    
+##  1 16th_century     &quot;The 16th century begins with the Julian year 1501 and e…
+##  2 21st_century     &quot;The 21st (twenty-first) century is the current century …
+##  3 AARP             &quot;AARP (formerly called the American Association of Retir…
+##  4 Abdominal_surge… &quot;The term abdominal surgery broadly covers surgical proc…
+##  5 Acacia           &quot;Acacia, commonly known as the wattles or acacias, is a …
+##  6 Acid             &quot;An acid is a molecule or ion capable of donating a prot…
+##  7 Adal_Sultanate   &quot;Dakkar (new capital, as Sultanate from 1420–1520) Harar…
+##  8 Aden             &quot;Aden (UK: // -dən US: // -den Arabic: ‎ ʿAdinʿAdan  Yem… 
+##  9 Adenosine_recep… &quot;The adenosine receptors (or P1 receptors) are a class o…
+## 10 Affogato         &quot;An affogato or more traditionally known as \&quot;affogato a…
+## # … with 1,121 more rows</code></pre>
 <p>Finally, we need to run the NLP annotation engine over this data set. Here is the code to run and save the results using the <strong>udpipe</strong> backend:</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cnlp_init_udpipe</span>(<span class="st">&quot;english&quot;</span>)</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>anno <span class="ot">&lt;-</span> <span class="fu">cnlp_annotate</span>(wiki)<span class="sc">$</span>token</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="fu">write_csv</span>(wiki, <span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea.csv&quot;</span>))</span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="fu">write_csv</span>(token, <span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea_token.csv.gz&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cnlp_init_udpipe</span>(<span class="st">&quot;english&quot;</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>anno <span class="ot">&lt;-</span> <span class="fu">cnlp_annotate</span>(wiki)<span class="sc">$</span>token</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="fu">write_csv</span>(wiki, <span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea.csv&quot;</span>))</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="fu">write_csv</span>(token, <span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea_token.csv.gz&quot;</span>))</span></code></pre></div>
 <p>The saved results can then be read-in and used without having to re-create the data set. We will use this data in several of our upcoming notebooks.</p>
 </div>
 <div id="latent-dirchlet-allocation" class="section level2">
 <h2>Latent Dirchlet Allocation</h2>
 <p>We will now proceed to the methodological topic for today. For consistency, let’s read back in the Wikipedia data and tokens files.</p>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea.csv&quot;</span>))</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>token <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea_token.csv.gz&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>wiki <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea.csv&quot;</span>))</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>token <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="fu">file.path</span>(<span class="st">&quot;data&quot;</span>, <span class="st">&quot;wiki_coffee_tea_token.csv.gz&quot;</span>))</span></code></pre></div>
 <p>Today we are going to investigate a method for <em>topic modeling</em>. This is an unsupervised task that seeks to identify topics within a corpus of text. What exactly is a topic? Mathematically speaking, it is usually defined as a probability distribution over a collection of words. Words that have a high probability within a topic tend to classify the topics themes in a colloquial sense. For example, a topic that captures the idea of baseball would have high probabilities on words such as “base”, “player”, “strike”, “umpire”, “team”, and so forth.</p>
 <p>We will be use a model today called Latent Dirchlet Allocation, or more commonly LDA. Given a fixed number of topics and fixed set of words (called a <em>lexicon</em>), LDA assumes that documents consist of a random collection of words constructed according to the following model:</p>
 <ol style="list-style-type: decimal">
@@ -582,11 +579,11 @@ summary {
 <p>You will notice that the description above is in some ways backwards from reality. It assumes that we know the distribution of the topics over the words and documents but do not know what words are present in the documents. In fact, we know the words but not the topics! This is an example of a Bayesian model. If we wrote down the assumptions rigorously, we could invert the probabilities using Bayes’ Theorem. That is, instead of knowing the probability of the documents given the topics, we can determine the probability of the topics given the documents. It is not possible to do this analytically, however, and a simulation method is needed to figure out what distribution of topics over the words and documents is most likely to have produced the observed data.</p>
 <p>As a final note about the method, the name comes from the standard distribution used to determine the topics (the Dirichlet distribution) and the fact that the topics themselves are never observed (that is, the are <em>latent</em>).</p>
 <p>Now, let’s actually compute an LDA topic model. The first step in creating a topic model is to compute a TF matrix. I tend to use only nouns, adjectives and adverbs for this task (verbs are okay too, if you would like).</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> token <span class="sc">%&gt;%</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(upos <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;NOUN&quot;</span>, <span class="st">&quot;ADJ&quot;</span>, <span class="st">&quot;ADV&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cnlp_utils_tf</span>(<span class="at">min_df =</span> <span class="fl">0.001</span>, <span class="at">max_df =</span> <span class="fl">0.5</span>, <span class="at">doc_set =</span> wiki<span class="sc">$</span>doc_id)</span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>X <span class="ot">&lt;-</span> token <span class="sc">%&gt;%</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(upos <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">&quot;NOUN&quot;</span>, <span class="st">&quot;ADJ&quot;</span>, <span class="st">&quot;ADV&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cnlp_utils_tf</span>(<span class="at">min_df =</span> <span class="fl">0.001</span>, <span class="at">max_df =</span> <span class="fl">0.5</span>, <span class="at">doc_set =</span> wiki<span class="sc">$</span>doc_id)</span></code></pre></div>
 <p>Next, we use the <code>sm_lda_topics</code> function. It requires passing the TF matrix as well as selecting the number of topics. Because this requires a simulation method, running the topic model can take a few minutes to complete. The results should be consistent from run to run because I have set the random seed inside of the implementation. The output contains two components, which we will save as individual data frames.</p>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>topic_model <span class="ot">&lt;-</span> <span class="fu">sm_lda_topics</span>(X, <span class="at">num_topics =</span> <span class="dv">16</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>topic_model <span class="ot">&lt;-</span> <span class="fu">sm_lda_topics</span>(X, <span class="at">num_topics =</span> <span class="dv">16</span>)</span></code></pre></div>
 <pre><code>## **** em iteration 1 ****
 ## document 1131
 ## new alpha = 3.08783
@@ -660,10 +657,10 @@ summary {
 ## document 1131
 ## new alpha = 0.03283
 ## final e step document 1131</code></pre>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>topic_docs <span class="ot">&lt;-</span> topic_model<span class="sc">$</span>docs</span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>topic_terms <span class="ot">&lt;-</span> topic_model<span class="sc">$</span>terms</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>topic_docs <span class="ot">&lt;-</span> topic_model<span class="sc">$</span>docs</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>topic_terms <span class="ot">&lt;-</span> topic_model<span class="sc">$</span>terms</span></code></pre></div>
 <p>The first data frame provides the probability distributions of the documents. It tells us own much weight each document receives from each topic.</p>
-<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>topic_docs</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>topic_docs</span></code></pre></div>
 <pre><code>## # A tibble: 18,096 x 3
 ##    doc_id             topic      prob
 ##    &lt;chr&gt;              &lt;int&gt;     &lt;dbl&gt;
@@ -679,13 +676,13 @@ summary {
 ## 10 Affogato               1 0.000333 
 ## # … with 18,086 more rows</code></pre>
 <p>Looking at the documents with the highest probability for each topic begins to show what the LDA algorithm has found in each topic. Can you categorize what themes some of these topics capture?</p>
-<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>topic_docs <span class="sc">%&gt;%</span></span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(topic, <span class="fu">desc</span>(prob)) <span class="sc">%&gt;%</span></span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(topic) <span class="sc">%&gt;%</span></span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(topic) <span class="sc">%&gt;%</span></span>
-<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">doc_id =</span> <span class="fu">paste</span>(topic, doc_id, <span class="at">sep =</span> <span class="st">&quot; =&gt; &quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">use_series</span>(doc_id)</span></code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>topic_docs <span class="sc">%&gt;%</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(topic, <span class="fu">desc</span>(prob)) <span class="sc">%&gt;%</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(topic) <span class="sc">%&gt;%</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(topic) <span class="sc">%&gt;%</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">doc_id =</span> <span class="fu">paste</span>(topic, doc_id, <span class="at">sep =</span> <span class="st">&quot; =&gt; &quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">use_series</span>(doc_id)</span></code></pre></div>
 <pre><code>##   [1] &quot;1 =&gt; Today_(American_TV_program)&quot;                                
 ##   [2] &quot;1 =&gt; Exchange-traded_fund&quot;                                       
 ##   [3] &quot;1 =&gt; Food_Network&quot;                                               
@@ -847,7 +844,7 @@ summary {
 ## [159] &quot;16 =&gt; Single-origin_coffee&quot;                                      
 ## [160] &quot;16 =&gt; Coffee_production_in_Panama&quot;</code></pre>
 <p>Similarly, the terms data frame gives the probability distribution of the terms. These probabilities can be quite small; rather than giving then on a raw scale, the function returns the logarithm of the probability in the column named <code>beta</code> (for this reason, these values are all negative).</p>
-<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>topic_terms</span></code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>topic_terms</span></code></pre></div>
 <pre><code>## # A tibble: 160,000 x 3
 ##    token topic  beta
 ##    &lt;chr&gt; &lt;int&gt; &lt;dbl&gt;
@@ -863,12 +860,12 @@ summary {
 ## 10 use      10 -7.70
 ## # … with 159,990 more rows</code></pre>
 <p>Looking at words for each topic gives another view for understanding the detected topics. In many applications, we do not have useful titles of the documents, and using the word distributions is the only automatic way of describing each topic.</p>
-<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>topic_terms <span class="sc">%&gt;%</span></span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(topic, <span class="fu">desc</span>(beta)) <span class="sc">%&gt;%</span></span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(topic) <span class="sc">%&gt;%</span></span>
-<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(topic) <span class="sc">%&gt;%</span></span>
-<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="fu">sm_paste</span>(token))</span></code></pre></div>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>topic_terms <span class="sc">%&gt;%</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(topic, <span class="fu">desc</span>(beta)) <span class="sc">%&gt;%</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(topic) <span class="sc">%&gt;%</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(topic) <span class="sc">%&gt;%</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="fu">sm_paste</span>(token))</span></code></pre></div>
 <pre><code>## # A tibble: 16 x 2
 ##    topic token_paste                                                         
 ##    &lt;int&gt; &lt;chr&gt;                                                               
@@ -893,15 +890,15 @@ summary {
 <div id="visualizing-topics-models" class="section level2">
 <h2>Visualizing Topics Models</h2>
 <p>Looking at the output of an LDA model in R can be a bit difficult. Let’s see a better way to visualize the results. Start by loading the topic.R file, which contains one additional function:</p>
-<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;topic.R&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;topic.R&quot;</span>)</span></code></pre></div>
 <pre><code>## 
 ## Attaching package: &#39;jsonlite&#39;</code></pre>
 <pre><code>## The following object is masked from &#39;package:purrr&#39;:
 ## 
 ##     flatten</code></pre>
 <p>Now, we will used the function <code>topics_create_json</code> to create a JSON file that contains the topics generated by the LDA model. We will write it to the local disk using <code>write_json</code>:</p>
-<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>topic_json <span class="ot">&lt;-</span> <span class="fu">topics_create_json</span>(topic_docs, topic_terms, wiki, <span class="at">truncate =</span> 1000L)</span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="fu">write_json</span>(topic_json, <span class="st">&quot;wiki-topics.json&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>topic_json <span class="ot">&lt;-</span> <span class="fu">topics_create_json</span>(topic_docs, topic_terms, wiki, <span class="at">truncate =</span> 1000L)</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="fu">write_json</span>(topic_json, <span class="st">&quot;wiki-topics.json&quot;</span>)</span></code></pre></div>
 <p>Now, go to the website <a href="https://statsmaths.github.io/topic-explo/build/">Topic Model Visualizer</a> and upload the JSON file that we just produced. It should create an interactive visualization for you to explore.</p>
 </div>
 

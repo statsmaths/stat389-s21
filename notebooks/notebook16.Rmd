@@ -49,39 +49,26 @@ to query the API over and over again.
 
 Now, we will use the function `wiki_expand_pages` to grab all of the pages
 that are linked to from the pages in the data frame `pages`. That is, returning
-data for all pages that are linked to from the Coffee or Tea pages. Be careful
-with this data set! RStudio has trouble displaying the raw text in the resulting
-data frame and will likely crash if you try to print out all of the columns or
-open the data in the view finder. It's better to just print out the page and
-lang variables
+data for all pages that are linked to from the Coffee or Tea pages.
 
 ```{r}
 exp_pages <- wiki_expand_pages(pages)
-select(exp_pages, page, lang)
+exp_pages
 ```
 
-We now have a corpus of 1131 pages. Finally, we will use the function
+We now have a corpus of 1131 pages. We will use the function
 `wiki_get_pages_text` to extract the raw text from the Wikipedia files.
 This requires parsing all of the HTML records and can take a minute or
 two to finish running, but note that it does not grab any additional data
-from the MediaWiki API. As with the previous data set, do not try to print
-out all of the columns of the data in R.
+from the MediaWiki API. The function itself returns each paragraph as an
+individual row; we use the function `tapply` to combine these into a single
+document.
 
 ```{r}
 wiki <- wiki_get_pages_text(exp_pages)
-select(wiki, page, sec_num, section)
-```
-
-Notice that the corpus now contains over 41 thousand documents because it
-extracts each paragraph as an individual document. It also includes the
-section number and title associated with each page. These can be useful for
-many analyses, but we will not make use of them right now. We can instead
-roll-up the pages so that each row of the data set contains only one page.
-
-```{r}
 wiki <- tapply(wiki$text, wiki$page, paste, collapse = " ")
 wiki <- tibble(doc_id = names(wiki), text = as.character(wiki))
-dim(wiki)
+wiki
 ```
 
 Finally, we need to run the NLP annotation engine over this data set. Here is
