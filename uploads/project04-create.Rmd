@@ -31,6 +31,7 @@ pages there are. Try to aim for somewhere between 100 and 1500 pages.
 starter_page_name <- c("")
 
 starter_page <- wiki_get_pages(starter_page_name, lang = "en")
+starter_page$links <- stri_replace_all(starter_page$links, "%26", fixed = "&")
 exp_pages <- wiki_expand_pages(starter_page)
 wiki <- wiki_get_pages_text(exp_pages)
 

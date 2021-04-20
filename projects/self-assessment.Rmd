@@ -1,0 +1,63 @@
+---
+title: "Self-Assessment Instructions"
+output:
+  html_document:
+    theme: cosmo
+    highlight: zenburn
+    css: "note-style.css"
+---
+
+**Due Date**: 27 April 2021 by 5pm
+
+## Overview
+
+The course syllabus describes the self-assessment as follows:
+
+> Projects will be graded as either Satisfactory/Unsatisfactory. At the end of
+> the semester, each student will individually submit a self­-assessment of their
+> work in the course, how they contributed to each project, and what they have
+> learned during the semester.
+
+Final grades will be determined by using this self-assessment to guide my
+own evaluation of your work through the semester:
+
+> All students who have earned satisfactory grades on the four projects, missed
+> no more than two classes,and have completed the course labs will earn a
+> grade of at least a B+. Grades of B+, A­, A, and A+ will be given according to
+> each student’s self­-assessment in light of their projects and course
+> participation.
+
+Detailed instructions for completing and submitting this document are given
+below.
+
+## Instructions
+
+The self-assessment consists of your responses to six questions. Each of these
+should take the form of a paragraph or two. The entire document has a strict
+two-page limit. Unlike the projects, you will be doing the self-assessment on
+your own. The questions to respond to are:
+
+1. What did you hope to get out of the class? Have you met these goals?
+2. Which project was your favorite? Why?
+3. If a friend asked you to describe the most significant thing you learned
+this semester, what would you say?
+4. Consider Project 3 (the Yelp data). Describe, specifically, how you
+contributed to your group's analysis and presentation.
+5. What aspect(s) of your work this semester was particularly strong?
+6. Suggest a letter grade for yourself that you feel accurately reflects your
+work. Briefly justify your suggestion.
+
+You can submit your assessment as either a pdf file or a docx file; the
+file should be named `selfassessment_first_last.docx` or
+`selfassessment_first_last.pdf` with your first and list names filled in.
+You may download a
+[template document file](https://raw.githubusercontent.com/statsmaths/stat389-s21/main/projects/selfassessment_first_last.docx)
+to use.
+
+## Submission
+
+I have shared a Box folder called `stat389_spring21_selfassessment` with the
+entire class. You should be able to upload files to this folder, but not
+download or preview them (therefore, the rest of the class will not be able to
+see your files). Please upload your document before the due date and time listed
+above.
